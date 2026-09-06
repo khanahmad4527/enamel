@@ -1,0 +1,18 @@
+{
+  "name": "enamel",
+  "private": true,
+  "description": "A multi-tenant dental practice backend on Directus, with a tested permission model.",
+  "license": "BUSL-1.1",
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f directus",
+    "provision": "pnpm --dir bootstrap provision",
+    "seed": "pnpm --dir bootstrap seed",
+    "verify": "pnpm --dir bootstrap verify",
+    "build:extensions": "pnpm --dir extensions/directus-extension-tooth-chart install && pnpm --dir extensions/directus-extension-tooth-chart build",
+    "reset": "./scripts/teardown.sh && ./scripts/setup.sh",
+    "setup": "./scripts/setup.sh",
+    "teardown": "./scripts/teardown.sh"
+  }
+}

@@ -1,0 +1,504 @@
+<p align="center">
+  <img src="brand/hero.png" alt="Enamel — a dental practice, modelled properly" width="820">
+</p>
+
+<h1 align="center">Enamel</h1>
+
+<p align="center">
+  A multi-tenant dental practice management backend on <a href="https://directus.io">Directus</a> —
+  built to show what a properly modelled schema and a tested permission model look like.
+</p>
+
+<p align="center">
+  <img alt="BSL 1.1" src="https://img.shields.io/badge/licence-BSL_1.1-0D6E63">
+  <img alt="Directus 12.3.1" src="https://img.shields.io/badge/Directus-12.3.1-0D6E63">
+  <img alt="access checks" src="https://img.shields.io/badge/access%20checks-21%2F21-2ECDA7">
+</p>
+
+---
+
+## Why this exists
+
+Most Directus demos show a blog. A blog has one kind of user and nothing worth
+protecting, so it never has to answer the question that actually decides whether
+a project succeeds: **who can see which fields, and how do you know?**
+
+A dental practice has to answer it on day one. The receptionist books the
+appointment and takes the payment, so she needs the patient list. She has no
+business reading the medical alerts. The hygienist needs the clinical record and
+has no business seeing the invoice. Get that wrong and you have either a
+practice that can't work or a data-protection incident.
+
+Enamel is that problem, solved in Directus, with the solution tested.
+
+## Branding
+
+<p align="center">
+  <img src="docs/screenshots/login.png" alt="The Enamel login screen" width="900">
+</p>
+
+The identity is applied **through the API in [`branding.ts`](bootstrap/src/branding.ts)**,
+not clicked into a browser session — so a clone gets the same login screen and
+the same admin chrome as everyone else, and a rebuild never loses it.
+
+Directus gives you more hooks than most people use: `project_logo` and
+`project_color` for the admin nav, `public_favicon` for the browser tab,
+`public_background` and `public_foreground` for the login screen, `public_note`
+for the sign-in message, and `theme_light_overrides` / `theme_dark_overrides`,
+which restyle the entire admin without a line of custom CSS.
+
+<p align="center">
+  <img src="docs/screenshots/admin.png" alt="The Enamel admin, themed, with the global bookmarks in the sidebar" width="900">
+</p>
+
+Only the tokens that carry the identity are overridden, so the admin keeps
+working across Directus upgrades instead of fighting them. Source assets —
+mark, logo, palette — are in [`brand/`](brand).
+
+The whole kit is uploaded into a **Branding** folder rather than the root of
+the file library, which is where a practice's scans and referral letters land;
+an admin who cannot tell the logo from a patient document eventually deletes
+the wrong one. Nine assets go in — the four Directus references plus both
+vector marks and the icon set — and an instance provisioned before the folder
+existed moves its files in on the next run instead of keeping two homes for
+them.
+
+## The one thing to look at
+
+<p align="center">
+  <img src="docs/screenshots/roles-compare.png" alt="The same patient record as seen by the front desk and by a dentist" width="900">
+</p>
+
+Same patient, same URL, two logins. On the left the form simply **ends** after
+Preferred Language — there is no Clinical section, no medical alerts, no tooth
+chart. That is not a hidden `div` or an `if` in a frontend. The API refuses the
+fields, so a curl request gets the same answer:
+
+```console
+$ curl -H "Authorization: Bearer $FRONT_DESK" \
+    "$API/items/patients?limit=1&fields=id,medical_alerts"
+{"errors":[{"message":"You don't have permission to access field \"medical_alerts\" …"}]}
+```
+
+It comes from about six lines in [`access/policies.ts`](bootstrap/src/access/policies.ts):
+
+```ts
+const FRONT_DESK_PATIENT_FIELDS = [
+  "id", "clinic", "reference", "status",
+  "first_name", "last_name", "date_of_birth",
+  "email", "phone", "address", "preferred_language",
+  // medical_alerts, allergies and clinical_notes are absent on purpose.
+];
+```
+
+## The permission model is tested
+
+A permission model you have not tried to break is a hope, not a policy.
+`pnpm verify` logs in as each role and asserts both directions — what they must
+be able to do, and what they must not:
+
+```console
+$ pnpm verify
+
+  PASS  front desk can read the patient list                         200
+  PASS  front desk CANNOT see medical_alerts
+  PASS  front desk CANNOT request medical_alerts explicitly          HTTP 403
+  PASS  front desk CANNOT read treatment records at all              HTTP 403
+  PASS  hygienist CAN see medical_alerts
+  PASS  hygienist CANNOT read invoices                               HTTP 403
+  PASS  dentist CANNOT create an invoice                             HTTP 403
+  PASS  each practice sees only its own patients                     riverside 12, marina 12, overlap 0
+  PASS  direct fetch of another practice's patient by id is refused  HTTP 403
+  PASS  portal user sees exactly one patient record                  1 visible
+
+  21/21 checks passed
+```
+
+The tenancy checks matter most. The seed creates **two** practices on purpose —
+with only one, a broken tenant filter is invisible, because everything you can
+see happens to be yours.
+
+## The tooth chart
+
+<p align="center">
+  <img src="docs/screenshots/tooth-chart.png" alt="FDI dental chart rendered inside the Directus admin" width="900">
+</p>
+
+A custom Directus interface, in [`extensions/directus-extension-tooth-chart`](extensions/directus-extension-tooth-chart).
+It uses **FDI notation** (ISO 3950 — quadrant, then position), lays the arches
+out as a clinician sees them (patient's right on the viewer's left), and sizes
+molars wider than incisors so the chart reads anatomically.
+
+Missing teeth are drawn as an *absence* — no fill, a dashed outline and a
+strike — rather than a pale tooth, because "healthy" and "missing" rendered as
+two similar off-whites is exactly the kind of ambiguity a clinical chart cannot
+afford. Selecting a tooth lifts it and underlines it in the accent colour, which
+reads as a chart annotation rather than a stray browser outline.
+
+It renders from `tooth_conditions`, which is an **append-only log** rather than
+32 mutable rows per patient. "What is tooth 26 today" is simply its latest
+entry, and the clinical history stays intact. Click any tooth for its timeline.
+
+Front-desk users are denied that collection, so the interface catches the 403
+and says so rather than looking broken.
+
+It is **not published to the Marketplace**, and `private: true` in its
+package.json prevents an accidental `npm publish`. The reason is honest:
+it reads `/items/tooth_conditions` and the field names `tooth_fdi`,
+`surface`, `condition` and `recorded_at` directly, with `options: null`.
+Installed anywhere but here it would render an empty chart. Publishing it
+would mean exposing those as interface options first — worth doing, but a
+separate piece of work, not a `npm publish` away.
+
+## What's in the box
+
+| | |
+|---|---|
+| **9 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, invoices, invoice_lines |
+| **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
+| **9 global bookmarks** | today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts to review (dentists) |
+| **5 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, flag overdue invoices (nightly) |
+| **1 custom interface** | the FDI tooth chart |
+| **Full branding** | logo, favicon, login screen and admin theme, applied as code |
+| **4 languages** | English, German, Dutch, French — collections, fields, notes, dividers, status labels, bookmark names, and the chart extension's own UI |
+| **Field validations** | FDI tooth numbers, email and phone shapes, non-negative prices, VAT bounds, no future birth dates |
+| **Demo data** | 2 practices, 8 staff + 2 portal logins, 24 patients, 52 appointments, 120 tooth findings, 16 invoices |
+
+### Multi-tenancy
+
+Every collection carries a `clinic`, and `directus_users` gains one too. Every
+policy filter compares the two:
+
+```ts
+const ownClinic = { clinic: { _eq: "$CURRENT_USER.clinic" } };
+```
+
+Creates are stamped with `presets: { clinic: "$CURRENT_USER.clinic" }`, so a
+user cannot plant a row in someone else's practice either. No application code
+is involved, which means no application code can forget.
+
+### Global bookmarks
+
+Defined once with `role: null`, so every user sees them — narrowed by whatever
+their own policies allow rather than duplicated per role. Filters use `$NOW` and
+`$CURRENT_USER`, which resolve per request, so "Today's diary" stays correct
+without a job rewriting it.
+
+### Flows, and what the platform will not do
+
+Five flows, and the interesting part is the three things that had to be
+worked around. All of it is in [`flows.ts`](bootstrap/src/flows.ts), tested
+by running them rather than by reading them.
+
+**There is no loop inside a flow.** Reminders need one email per patient,
+and a flow is a single chain. The `trigger` operation runs *another* flow
+once per element of an array, so the per-patient work is its own flow and
+the hourly one just hands over the list — `iterationMode: "serial"`,
+because a hundred concurrent sends is how a practice gets rate-limited.
+
+**`$NOW` is a filter variable, not a payload one.** Writing
+`{ reminder_sent_at: "$NOW" }` sends Postgres the literal string `$NOW`
+and the update fails with a parse error. Nothing in a flow can produce the
+current time without the script operation, which is inert in this image —
+so the field is a boolean, `reminder_sent`, and `date_updated` records
+when.
+
+**`item-update` with an empty `key` is a loaded gun on 11.** Read the rows,
+feed them to an update, and on a night with nothing to do the key collapses
+to empty — which on 12.3.0+ is a harmless no-op, and on 11 falls through to
+updateByQuery with an empty query and rewrites every row in the collection.
+The nightly overdue flow is therefore one query-scoped update and no read
+at all. An empty match updates nothing; that is the whole point.
+
+One more worth knowing, because it changes what a green flow means: the
+mail operation calls `send()` without awaiting it and swallows the
+rejection into a log line. It resolves whether or not anything was
+delivered. Mail goes to [Mailpit](http://localhost:8025) here so you can
+see for yourself rather than trust the flow.
+
+## Validation lives in the schema
+
+Rules are on the fields, so the API enforces them whatever writes to it —
+the admin, an import script, or a frontend you have not written yet:
+
+```console
+$ curl -X POST … -d '{"tooth_fdi": 19, "condition": "caries"}'
+{"errors":[{"message":"Validation failed for field \"tooth_fdi\". Value has to be one of […]"}]}
+```
+
+FDI numbering is not a contiguous range — 19, 20, 29 and 30 do not exist — so
+tooth fields validate against an explicit list rather than `_between 11 and 48`,
+which would quietly accept nonsense. Prices cannot be negative, VAT is bounded
+to 0–100, chair time to 5–480 minutes, and a date of birth cannot be in the
+future.
+
+## Four languages, end to end
+
+<p align="center">
+  <img src="docs/screenshots/admin-de.png" alt="The Enamel admin in German" width="900">
+</p>
+
+English, German, Dutch and French — and not just collection names. Field
+labels, field notes, section dividers, status choices and bookmark names are
+all translated, because a receptionist in Rotterdam reading "Medical alerts"
+in English defeats the point.
+
+Directus has three separate translation mechanisms and
+[`i18n/`](bootstrap/src/i18n) uses all of them:
+
+| Mechanism | Used for |
+|---|---|
+| `directus_collections.translations` | Collection names, with singular *and* plural — German and Dutch inflect differently from English |
+| `directus_fields.meta.translations` | Field labels |
+| `directus_translations` + `$t:key` | Everything with no translations array of its own: bookmark names, field notes, divider titles, status labels |
+
+Labels are keyed by field name rather than `collection.field`, because
+`patient`, `status` and `notes` mean the same thing everywhere they appear —
+translated once, applied wherever they occur. 55 keys across 4 languages —
+220 rows — plus 11 collection names and 89 field labels.
+
+`$t:` reaches less than you would hope, and the boundary is worth knowing
+before you design around it. Tested against 12.3.1, these four render the
+literal string `$t:your_key` on screen: **folder names**, **file titles**, the
+**project descriptor**, and the **login note**. So the one word naming the
+brand folder has to work in all four languages by itself, and the sign-in
+message stays English.
+
+They also do not reach strings compiled into an
+extension, so the tooth chart ships its own table
+([`messages.ts`](extensions/directus-extension-tooth-chart/src/messages.ts))
+covering condition names, tooth anatomy, arch labels and error states, and
+reads only the active locale from the app. Regional variants fall back by
+language subtag, so `de-AT` reads German rather than English.
+
+## Why this provisions rather than syncs
+
+Directus 12.3.0 shipped `@directus/cli` (`d6s sync pull | diff | push`),
+which finally moves configuration between instances — roles, policies,
+access, permissions, flows, operations, dashboards, panels, settings and
+translations, on top of the schema. That is the right tool for promoting
+staging to production, and it did not exist when this was written.
+
+It is not the right tool for *this* repo, for three reasons:
+
+- **It syncs between two live instances.** Enamel's claim is `git clone`
+  → running practice, from nothing. There is no source instance to pull
+  from.
+- **It skips two things this project needs.** `directus_presets` is out
+  of scope, so the nine global bookmarks would not travel. And settings
+  sync deliberately strips `project_logo`, `public_favicon`,
+  `public_background` and `public_foreground`, because `directus_files`
+  is not synced — so the whole visual identity would arrive blank.
+- **Both ends must run the same patch version of 12.2+**, on the same
+  database vendor — so a sync cannot cross a major version at all, and
+  the CLI does not exist on 11. This code does cross it: the same source
+  provisions 11.17.4 and 12.3.1, 21/21 on each. Version portability is
+  the property a dump cannot have, because a dump is a snapshot of one
+  server's internals and this is a description of what you want.
+
+The classic `/schema/snapshot` has never covered any of this: it is
+collections, fields and relations only, and that is unchanged from
+11.17.4 through 12.3.1.
+
+So the trade is deliberate. Declarative TypeScript against the REST API
+covers everything — schema, access, bookmarks, flows, branding files,
+translations — from an empty database, and stays readable as a diff.
+Environment Sync is the better answer once there are two environments to
+keep in step; on a project with real staging and production I would use
+both, sync for promotion and this for the initial stand-up.
+
+## Directus 12
+
+This runs **Directus 12.3.1**. It works, with one prerequisite worth
+stating plainly.
+
+12.x gates custom rules on access policies behind a licence, and every
+filter and field restriction here is such a rule. On an **unlicensed**
+12.x, provisioning fails ~90 times with:
+
+```
+custom_permission_rules_enabled is a restricted resource.
+```
+
+That is not a degraded access model — it is no access model. So `pnpm
+setup` checks entitlements before provisioning and stops with an
+explanation rather than letting you read ninety identical errors.
+
+Two ways past it:
+
+- **A free Open Innovation Grant key** — under $5M revenue and under 50
+  employees. Set `DIRECTUS_LICENSE_KEY` in `.env`; the server activates it
+  on boot and stores the token. Activation is silent, so check
+  `GET /license` for `status: active` rather than the logs, and recreate
+  the container if a first attempt fails.
+  [Details](https://directus.com/docs/licensing/open-innovation-grant).
+- **`DIRECTUS_IMAGE=directus/directus:11`** — 11.17.4 has no such gate.
+
+Both are tested: 21/21 on a clean 12.3.1 with an OIG key, and 21/21 on
+11.17.4 with no key at all.
+
+### What else changed, measured rather than assumed
+
+- The tooth-chart interface **loads and enables on 12.x despite declaring
+  `host: ^11.0.0`** — that range drives a Marketplace compatibility
+  warning, not a load-time gate.
+- Migrating an 11.17.4 database in place to 12.3.1 kept all 21 checks
+  passing; no data work was needed.
+- **Theme overrides need porting.** 12.0.0 dropped the `navigation.*`
+  scope for `shell.*`. The overrides here still use `navigation.*`, which
+  12 accepts and ignores, so the identity survives — teal logo tile,
+  correct project name — but the nav bar no longer takes the brand colour.
+- **12.3.0 changed Update/Delete Items flow operations**: with empty
+  targeting they now return null instead of acting on the whole
+  collection. Nothing here depends on that; a flow written against 11
+  might.
+
+### Environment Sync
+
+12.3.0 shipped `@directus/cli` (`npx @directus/cli`, binary `d6s`), which
+syncs roles, policies, access, permissions, flows, operations, dashboards,
+panels, settings and translations between instances. It is a client-side
+package, not part of the server image.
+
+It is the right tool for promoting staging to production, and still not a
+substitute for this repo — see *Why this provisions rather than syncs*.
+
+## Running it
+
+```bash
+git clone https://github.com/khanahmad4527/enamel && cd enamel
+./scripts/setup.sh            # or: pnpm setup
+```
+
+That is the whole thing: it writes `.env` with a fresh `SECRET`, builds the
+tooth-chart interface, starts Postgres, Redis and Directus, checks the
+licence entitlements, provisions, seeds, and verifies. A clean clone on a
+warm Docker cache reaches a seeded practice passing 21/21 in about 30
+seconds. Re-running is how you pick up a change — every step is idempotent,
+so the second run creates nothing and skips ~200 things.
+
+On Directus 12 there are exactly two values to set in `.env` first, and the
+script stops and names both if you have not:
+
+- `DIRECTUS_LICENSE_KEY` — 12.x refuses custom rules on access policies
+  without one, and those rules are the whole project. An
+  [Open Innovation Grant](https://directus.com/docs/licensing/open-innovation-grant)
+  key is free under $5M revenue and 50 employees. Or set
+  `DIRECTUS_IMAGE=directus/directus:11` and skip the question.
+- `PROJECT_OWNER_EMAIL` — Directus 12 asks for one the first time you sign
+  in, and setting it here answers that dialog instead of meeting it later.
+
+**Tear down with `./scripts/teardown.sh`, never `docker compose down -v`.**
+A licence key allows a limited number of activations and a fresh database
+claims one on boot; wiping the volume strands the old activation, because
+the licence server is never told. Rebuild a few times that way and the key
+stops working, with `FATAL: Activation limit exceeded` at boot. The
+teardown script deactivates first, which gives the activation back.
+
+### Step by step, if you would rather see it
+
+```bash
+cp .env.example .env          # then set SECRET, DB_PASSWORD, ADMIN_PASSWORD
+
+# The tooth-chart interface is compiled output and is not committed, so
+# build it first — Directus loads whatever is in extensions/ at boot.
+cd extensions/directus-extension-tooth-chart && pnpm install && pnpm build && cd ../..
+
+docker compose up -d          # ~10s to a healthy Directus
+
+cd bootstrap
+pnpm install
+pnpm provision                # schema, policies, roles, bookmarks, flows, branding, translations
+pnpm seed                     # ... plus two practices of demo data
+pnpm verify                   # prove the access model holds
+```
+
+Or, from the repo root, the same thing as scripts: `pnpm build:extensions`,
+`pnpm up`, `pnpm provision`, `pnpm seed`, `pnpm verify`. `pnpm reset` is a
+teardown followed by a setup, and goes through the deactivation.
+
+Admin at **http://localhost:8056** (the port is `DIRECTUS_PORT`; 8055 is often
+already taken by another Directus).
+
+### Demo logins
+
+All use the password `EnamelDemo!2026`. Log in as two of them side by side —
+that is the fastest way to understand the access model.
+
+| Role | Riverside Dental | Marina Smile Clinic |
+|---|---|---|
+| Practice owner | `owner@riverside.example.com` | `owner@marina.example.com` |
+| Dentist | `dentist@riverside.example.com` | `dentist@marina.example.com` |
+| Hygienist | `hygienist@riverside.example.com` | `hygienist@marina.example.com` |
+| Front desk | `desk@riverside.example.com` | `desk@marina.example.com` |
+| Patient portal | `patient@riverside.example.com` | `patient@marina.example.com` |
+
+## Why provisioning is code, not a snapshot
+
+The usual way to share a Directus schema is `directus schema snapshot`, which
+produces a YAML blob nobody can read or review. Everything here is declarative
+TypeScript instead — [`schema/`](bootstrap/src/schema) describes intent,
+[`apply.ts`](bootstrap/src/apply.ts) turns it into API calls.
+
+Every operation is idempotent, so re-running is how you pick up a change:
+
+```console
+$ pnpm provision
+  · collection patients (exists)
+  · bookmark "Today's diary" (exists)
+  0 created, 192 skipped
+```
+
+That means a permission change arrives as a reviewable diff in a pull request,
+which is the entire argument.
+
+## Things worth knowing
+
+Findings from building this that cost time and are not obvious:
+
+- **The `exec` ("Run Script") operation does not run in the `directus/directus:11`
+  image.** It reports no error — the flow simply completes with no effect, which
+  is miserable to debug. Every flow here uses native operations instead;
+  `item-read` supports `aggregate`, which covers most of what a script gets
+  reached for. The invoice-total flow sums lines in the database.
+- **Directus rejects `.local` and `.example` email addresses.** Its validator
+  wants a real TLD, so demo accounts use `example.com` (RFC 2606).
+- **The official image runs Directus under PM2 in cluster mode.** Set
+  `MESSENGER_STORE=redis` so flow and extension reloads reach every worker.
+- **Deleting an invoice line leaves a stale subtotal.** On delete, Directus hands
+  the flow the deleted keys but not the payload, so there is no way to learn
+  which invoice the row belonged to. The flow is scoped to create and update, and
+  `invoice_lines` is hidden from the sidebar — the workflow is to void and
+  reissue an invoice, not delete its lines.
+
+## Scope, honestly
+
+This is a reference build, not a product. It models patients, scheduling,
+clinical records, charting and invoicing well, and deliberately stops there — no
+inventory, payroll, insurance claims or lab orders. Depth in the access model is
+the point; breadth of features is not.
+
+**All data is invented.** Never point this at real patients. Nothing here claims
+HIPAA or GDPR compliance — it demonstrates the access-control patterns clinical
+data requires, which is a necessary part of compliance and nowhere near all of it.
+
+## Licence
+
+**Business Source License 1.1.**
+
+(Directus itself used BSL 1.1 through the 11.x line; 12.0.0 moved the
+project to the Monospace Sustainable Core License. BSL is chosen here on
+its own merits, not to mirror upstream.)
+
+Read it, run it, learn from it, adapt it for evaluation or internal
+non-commercial use: all permitted. Offering it, or something substantially
+derived from it, to third parties as a product or hosted service is not.
+It converts to MIT on 2030-09-05.
+
+This is a reference build that exists to be read. If you want a practice
+management system built on it — or something in a different domain
+modelled to the same standard — [that's the point](https://khanahmad.com).
+
+Built by [Ahmad Khan](https://khanahmad.com) — Directus specialist,
+[5 merged pull requests](https://github.com/directus/directus/pulls?q=is%3Apr+author%3Akhanahmad4527+is%3Amerged)
+in the Directus core.

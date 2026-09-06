@@ -1,0 +1,21 @@
+{
+  "name": "@enamel/bootstrap",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "provision": "tsx src/index.ts",
+    "seed": "tsx src/index.ts --seed",
+    "reset": "tsx src/index.ts --reset --seed",
+    "typecheck": "tsc --noEmit",
+    "verify": "tsx src/verify.ts"
+  },
+  "dependencies": {
+    "@directus/sdk": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "license": "BUSL-1.1"
+}

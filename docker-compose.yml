@@ -1,0 +1,102 @@
+# Enamel — local stack.
+# Postgres holds the data, Redis backs the cache and flow queue, Directus
+# serves the API and admin. Extensions and uploads are bind-mounted so a
+# rebuild never loses them.
+
+services:
+  database:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-enamel}
+      POSTGRES_USER: ${DB_USER:-enamel}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - ./data/database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-enamel}", "-d", "${DB_DATABASE:-enamel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Directus can only demonstrate the reminder flow if something accepts
+  # the mail. The default sendmail transport pipes to a binary the image
+  # does not contain, so every send failed and the flow's next step never
+  # ran. Mailpit takes SMTP on 1025 and shows what arrived on 8025.
+  mail:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  directus:
+    image: ${DIRECTUS_IMAGE:-directus/directus:11}
+    restart: unless-stopped
+    ports:
+      - "${DIRECTUS_PORT:-8056}:8055"
+    volumes:
+      - ./uploads:/directus/uploads
+      - ./extensions:/directus/extensions
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    environment:
+      SECRET: ${SECRET:?set SECRET in .env}
+      # Derived from the one place the port is declared, so moving the
+      # port cannot leave the admin emitting dead links.
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:${DIRECTUS_PORT:-8056}}
+
+      DB_CLIENT: pg
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-enamel}
+      DB_USER: ${DB_USER:-enamel}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      CACHE_ENABLED: "true"
+      CACHE_STORE: redis
+      REDIS: redis://cache:6379
+
+      # The official image runs Directus under PM2 in cluster mode, so
+      # there is more than one worker. Flow and extension reloads are
+      # broadcast between workers over the messenger — without Redis here
+      # only the worker that handled the write learns about a new flow,
+      # and event-triggered flows silently never fire on the others.
+      MESSENGER_STORE: redis
+      SYNCHRONIZATION_STORE: redis
+
+      # Directus 12 runs unlicensed on a free Core tier, but that tier
+      # refuses custom rules on access policies — the entire subject of
+      # this project — and caps user seats at 3. A key restores both.
+      LICENSE_KEY: ${DIRECTUS_LICENSE_KEY:-}
+
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@enamel.dev}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+
+      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@enamel.dev}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-mail}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-1025}
+      EMAIL_SMTP_SECURE: "false"
+      EMAIL_SMTP_IGNORE_TLS: "true"
+
+      # Demo data only. Never point this at a real patient database.
+      EXTENSIONS_AUTO_RELOAD: "true"
+      WEBSOCKETS_ENABLED: "true"

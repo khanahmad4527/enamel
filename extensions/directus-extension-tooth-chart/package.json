@@ -1,0 +1,43 @@
+{
+  "name": "directus-extension-tooth-chart",
+  "version": "1.0.0",
+  "description": "An FDI dental chart as a Directus interface. Reads an append-only findings log and renders the current state of every tooth.",
+  "private": true,
+  "license": "BUSL-1.1",
+  "author": "Ahmad Khan <ahmad@khanahmad.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanahmad4527/enamel.git",
+    "directory": "extensions/directus-extension-tooth-chart"
+  },
+  "homepage": "https://github.com/khanahmad4527/enamel#the-tooth-chart",
+  "keywords": [
+    "directus",
+    "directus-extension",
+    "directus-custom-interface",
+    "dental",
+    "odontogram"
+  ],
+  "type": "module",
+  "icon": "dentistry",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "directus:extension": {
+    "type": "interface",
+    "path": "dist/index.js",
+    "source": "src/index.ts",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^13.0.0",
+    "typescript": "^5.7.2",
+    "vue": "^3.5.13"
+  }
+}
