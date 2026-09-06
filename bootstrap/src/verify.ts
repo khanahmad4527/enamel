@@ -1,13 +1,19 @@
 /**
- * Access-control test suite.
+ * The test suite.
  *
- * A permission model you haven't tried to break is a hope, not a policy.
- * This logs in as each role and asserts both directions: what they must
- * be able to do, and what they must not. It is the file to run after any
- * change to access/policies.ts.
+ * Two halves. The access model is the important one: a permission model
+ * you haven't tried to break is a hope, not a policy, so it logs in as
+ * each role and asserts both directions — what they must be able to do,
+ * and what they must not.
+ *
+ * The second half covers everything else the README claims. Provisioning
+ * logs its per-item failures rather than throwing, so a run can finish
+ * with the branding half-applied, no bookmarks and a flow missing, and
+ * until these checks existed the only thing standing between that and a
+ * green tick was somebody reading the scrollback.
  */
 
-import { URL_BASE, DEMO_PASSWORD } from "./env.js";
+import { URL_BASE, DEMO_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD } from "./env.js";
 
 const BASE = URL_BASE;
 
@@ -18,11 +24,11 @@ function check(name: string, pass: boolean, detail = ""): void {
   results.push({ name, pass, detail });
 }
 
-async function login(email: string): Promise<string> {
+async function login(email: string, password = DEMO_PASSWORD): Promise<string> {
   const res = await fetch(`${BASE}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password: DEMO_PASSWORD }),
+    body: JSON.stringify({ email, password }),
   });
   const body = (await res.json()) as { data?: { access_token: string } };
   if (!body.data?.access_token) throw new Error(`cannot log in as ${email}`);
@@ -38,7 +44,7 @@ async function get(token: string, path: string) {
 }
 
 async function main() {
-  console.log(`\n  Access-control checks against ${BASE}\n`);
+  console.log(`\n  Checks against ${BASE}\n`);
 
   /* ---------- front desk: the headline claim ---------------------- */
   const desk = await login("desk@riverside.example.com");
@@ -151,6 +157,113 @@ async function main() {
   const portalOthers = await get(portal, "/items/appointments?limit=-1&fields=id,patient");
   const patientIds = new Set(((portalOthers.data ?? []) as Array<{ patient: string }>).map((a) => a.patient));
   check("portal user sees only their own appointments", patientIds.size <= 1, `${patientIds.size} distinct patients`);
+
+  /* ================= provisioning ==================================== */
+  const admin = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+  const rows = async (path: string): Promise<Array<Record<string, unknown>>> => {
+    const r = await get(admin, path);
+    return Array.isArray(r.data) ? (r.data as Array<Record<string, unknown>>) : [];
+  };
+  const one = async (path: string): Promise<Record<string, unknown>> => {
+    const res = await fetch(`${BASE}${path}`, { headers: { authorization: `Bearer ${admin}` } });
+    const body = (await res.json().catch(() => ({}))) as { data?: Record<string, unknown> };
+    return body.data ?? {};
+  };
+
+  /* ---------- schema ------------------------------------------------- */
+  const collections = (await rows("/collections")).filter(
+    (c) => !String(c["collection"]).startsWith("directus_"),
+  );
+  const tables = collections.filter((c) => c["schema"]);
+  const folders = collections.filter((c) => !c["schema"]);
+  check("9 collections and 2 sidebar folders exist", tables.length === 9 && folders.length === 2,
+    `${tables.length} tables, ${folders.length} folders`);
+
+  /* ---------- validation actually rejects ----------------------------- */
+  // Not "a rule is configured" — an attempt that must fail.
+  const badTooth = await fetch(`${BASE}/items/tooth_conditions`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${admin}`, "content-type": "application/json" },
+    body: JSON.stringify({ tooth_fdi: 19, condition: "caries" }),
+  });
+  check("an impossible FDI number is refused by the schema", badTooth.status >= 400,
+    `HTTP ${badTooth.status}`);
+
+  /* ---------- branding ------------------------------------------------ */
+  const settings = await one(
+    "/settings?fields=project_name,project_color,project_logo,public_favicon," +
+      "public_background,public_foreground,public_note,custom_css,default_language,theme_dark_overrides",
+  );
+  const branded = ["project_logo", "public_favicon", "public_background", "public_foreground"]
+    .every((k) => Boolean(settings[k]));
+  check("branding is applied, not just uploaded",
+    branded && settings["project_name"] === "Enamel" && Boolean(settings["theme_dark_overrides"]),
+    branded ? "logo, favicon, login art, theme" : "one or more assets missing");
+
+  const brandFolder = (await rows("/folders?fields=id,name&limit=-1"))
+    .find((f) => f["name"] === "Branding");
+  const brandFiles = brandFolder
+    ? await rows(`/files?limit=-1&fields=id&filter[folder][_eq]=${brandFolder["id"]}`)
+    : [];
+  check("the brand kit is in its own folder", brandFiles.length >= 9,
+    `${brandFiles.length} files in Branding`);
+
+  /* ---------- translations -------------------------------------------- */
+  const translations = await rows("/translations?limit=-1&fields=key,language");
+  const langs = new Set(translations.map((t) => String(t["language"])));
+  const perLang = [...langs].map((l) => translations.filter((t) => t["language"] === l).length);
+  check("four languages, none of them short",
+    langs.size === 4 && perLang.every((n) => n === perLang[0]) && (perLang[0] ?? 0) >= 50,
+    `${[...langs].sort().join(", ")} — ${perLang[0]} keys each`);
+
+  const patientFields = await rows("/fields/patients");
+  const translated = patientFields.filter((f) => {
+    const meta = (f["meta"] ?? {}) as { translations?: unknown[] };
+    return Array.isArray(meta.translations) && meta.translations.length >= 3;
+  });
+  check("field labels carry their own translations", translated.length >= 15,
+    `${translated.length} of ${patientFields.length} patient fields`);
+
+  /* ---------- bookmarks ------------------------------------------------ */
+  const presets = (await rows("/presets?limit=-1&fields=id,bookmark,collection,user"))
+    .filter((p) => p["user"] === null && p["bookmark"]);
+  const unresolved = presets.filter((p) => !String(p["bookmark"]).startsWith("$t:"));
+  check("nine global bookmarks, all translated", presets.length === 9 && unresolved.length === 0,
+    `${presets.length} bookmarks`);
+
+  /* ---------- flows ---------------------------------------------------- */
+  const flows = await rows("/flows?limit=-1&fields=id,name,status,trigger");
+  const inactive = flows.filter((f) => f["status"] !== "active");
+  check("five flows, all active", flows.length === 5 && inactive.length === 0,
+    `${flows.length} flows${inactive.length ? `, ${inactive.length} inactive` : ""}`);
+
+  // The bug this catches: an item-update whose key is an item-read result.
+  // It throws at run time and nothing before this noticed.
+  const operations = await rows("/operations?limit=-1&fields=id,key,type,options");
+  const danger = operations.filter((o) => {
+    if (o["type"] !== "item-update") return false;
+    const opts = (o["options"] ?? {}) as { key?: unknown; query?: unknown };
+    const key = typeof opts.key === "string" ? opts.key : "";
+    // A mustache pointing at a whole read result, rather than one id.
+    return /^\{\{\s*[a-z_]+\s*\}\}$/i.test(key) && !key.includes(".") && !opts.query;
+  });
+  check("no flow feeds a whole read result into item-update", danger.length === 0,
+    danger.length ? danger.map((d) => String(d["key"])).join(", ") : "checked " + operations.length);
+
+  /* ---------- the extension -------------------------------------------- */
+  const extensions = await rows("/extensions");
+  const chart = extensions.find((e) => String(e["id"] ?? "") && JSON.stringify(e).includes("tooth-chart"));
+  const chartMeta = (chart?.["meta"] ?? {}) as { enabled?: boolean };
+  check("the tooth-chart interface is installed and enabled",
+    Boolean(chart) && chartMeta.enabled !== false,
+    chart ? "loaded" : "not registered — was it built before Directus started?");
+
+  const toothChartField = (await rows("/fields/patients"))
+    .find((f) => f["field"] === "tooth_chart");
+  const tcMeta = (toothChartField?.["meta"] ?? {}) as { interface?: string };
+  check("the patient form actually uses it", tcMeta.interface === "tooth-chart",
+    tcMeta.interface ?? "field missing");
 
   /* ---------- report ------------------------------------------------ */
   const pad = Math.max(...results.map((r) => r.name.length));

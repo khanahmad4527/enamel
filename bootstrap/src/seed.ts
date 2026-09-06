@@ -68,7 +68,15 @@ async function findOrCreateUser(
     "find user",
     api.get(`/users?limit=1&fields=id&filter[email][_eq]=${encodeURIComponent(email)}`),
   );
-  if (found.length && found[0]) return found[0];
+  if (found.length && found[0]) {
+    // Reconciled, not skipped — otherwise a change here (a role, a
+    // clinic, a UI language) only ever reaches an empty database, and
+    // every existing demo instance quietly keeps the old value. The
+    // password is deliberately not in the patch: re-seeding should not
+    // reset one somebody has changed.
+    await must("update user", api.patch(`/users/${found[0].id}`, payload));
+    return found[0];
+  }
   return must<Row>("create user", api.post("/users", { email, password: DEMO_PASSWORD, ...payload }));
 }
 
@@ -89,11 +97,22 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     log.made(`clinic ${practice.name}`);
 
     // --- staff, one per role -----------------------------------------
+    // `language` is a system field on directus_users, and it is the only
+    // thing that makes the German, Dutch and French work visible. Left
+    // unset, every account opens in English and 165 translated strings
+    // sit there unread.
+    //
+    // Set per person rather than per practice, because that is how it
+    // actually works — a Dutch hygienist in an Amsterdam practice sets
+    // her own interface to Dutch, and the English-speaking associate in
+    // the next room does not. The two accounts the login screen sends
+    // you to stay in English, so the access-model comparison is not also
+    // a language lesson.
     const staff = [
-      { key: "owner",  role: "Practice owner", first: ci === 0 ? "Hannah" : "Layla", last: ci === 0 ? "Prins" : "Haddad", job: "principal_dentist" },
-      { key: "dentist", role: "Dentist",       first: ci === 0 ? "Sam" : "Omar",     last: ci === 0 ? "Okonkwo" : "Rashid", job: "associate_dentist" },
-      { key: "hygienist", role: "Hygienist",   first: ci === 0 ? "Ilse" : "Priya",   last: ci === 0 ? "Dekker" : "Menon",  job: "hygienist" },
-      { key: "desk",   role: "Front desk",     first: ci === 0 ? "Bram" : "Zara",    last: ci === 0 ? "Vos" : "Khalil",    job: "receptionist" },
+      { key: "owner",  role: "Practice owner", first: ci === 0 ? "Hannah" : "Layla", last: ci === 0 ? "Prins" : "Haddad", job: "principal_dentist", lang: ci === 0 ? "nl-NL" : "en-US" },
+      { key: "dentist", role: "Dentist",       first: ci === 0 ? "Sam" : "Omar",     last: ci === 0 ? "Okonkwo" : "Rashid", job: "associate_dentist", lang: "en-US" },
+      { key: "hygienist", role: "Hygienist",   first: ci === 0 ? "Ilse" : "Priya",   last: ci === 0 ? "Dekker" : "Menon",  job: "hygienist", lang: ci === 0 ? "nl-NL" : "en-US" },
+      { key: "desk",   role: "Front desk",     first: ci === 0 ? "Bram" : "Zara",    last: ci === 0 ? "Vos" : "Khalil",    job: "receptionist", lang: "en-US" },
     ];
 
     const users: Record<string, string> = {};
@@ -105,6 +124,7 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
         role: roleIds.get(s.role) ?? null,
         clinic: clinic.id,
         job_title: s.job,
+        language: s.lang,
         status: "active",
       });
       users[s.key] = u.id;

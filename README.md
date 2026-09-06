@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="BSL 1.1" src="https://img.shields.io/badge/licence-BSL_1.1-0D6E63">
   <img alt="Directus 12.3.1" src="https://img.shields.io/badge/Directus-12.3.1-0D6E63">
-  <img alt="access checks" src="https://img.shields.io/badge/access%20checks-21%2F21-2ECDA7">
+  <img alt="access checks" src="https://img.shields.io/badge/checks-32%2F32-2ECDA7">
 </p>
 
 ---
@@ -91,7 +91,7 @@ const FRONT_DESK_PATIENT_FIELDS = [
 ];
 ```
 
-## The permission model is tested
+## Everything here is tested
 
 A permission model you have not tried to break is a hope, not a policy.
 `pnpm verify` logs in as each role and asserts both directions — what they must
@@ -111,12 +111,32 @@ $ pnpm verify
   PASS  direct fetch of another practice's patient by id is refused  HTTP 403
   PASS  portal user sees exactly one patient record                  1 visible
 
-  21/21 checks passed
+  32/32 checks passed
 ```
 
 The tenancy checks matter most. The seed creates **two** practices on purpose —
 with only one, a broken tenant filter is invisible, because everything you can
 see happens to be yours.
+
+Eleven of the thirty-two cover provisioning rather than access, because
+provisioning logs its per-item failures instead of throwing: a run can finish
+with the branding half-applied, no bookmarks and a flow missing. They assert
+that the brand kit is in its folder, that four languages are present and the
+same length, that nine bookmarks exist and all resolve through `$t:`, that five
+flows are active, that the tooth-chart interface both loaded *and* is the
+interface the patient form uses — and that posting an impossible FDI number is
+refused, which is the validation claim rather than a description of it.
+
+One of them is a regression guard with a story: it fails any flow whose
+`item-update` takes a whole `item-read` result as its `key`, because two of them
+did, and on Directus 11 that rewrites every row in the collection.
+
+Writing these found a bug immediately, and not in provisioning. Sabotaging the
+instance on purpose — deactivating a flow, renaming the brand folder — produced
+32/32 anyway. `CACHE_AUTO_PURGE` defaults to false, so Directus was serving a
+read cache that a write never invalidated: the database said `inactive` while
+the API said `active`. It is `true` in the compose file now. A check that cannot
+observe a change cannot fail, and a suite that cannot fail is decoration.
 
 ## The tooth chart
 
@@ -292,7 +312,7 @@ It is not the right tool for *this* repo, for three reasons:
 - **Both ends must run the same patch version of 12.2+**, on the same
   database vendor — so a sync cannot cross a major version at all, and
   the CLI does not exist on 11. This code does cross it: the same source
-  provisions 11.17.4 and 12.3.1, 21/21 on each. Version portability is
+  provisions 11.17.4 and 12.3.1, green on each. Version portability is
   the property a dump cannot have, because a dump is a snapshot of one
   server's internals and this is a description of what you want.
 
@@ -334,16 +354,18 @@ Two ways past it:
   [Details](https://directus.com/docs/licensing/open-innovation-grant).
 - **`DIRECTUS_IMAGE=directus/directus:11`** — 11.17.4 has no such gate.
 
-Both are tested: 21/21 on a clean 12.3.1 with an OIG key, and 21/21 on
-11.17.4 with no key at all.
+Both are tested from an empty database: the access-model half passed
+21/21 on a clean 12.3.1 with an OIG key, and 21/21 on 11.17.4 with no key
+at all. The suite has since grown to 32 — the extra eleven cover
+provisioning, and have only been run against an existing instance.
 
 ### What else changed, measured rather than assumed
 
 - The tooth-chart interface **loads and enables on 12.x despite declaring
   `host: ^11.0.0`** — that range drives a Marketplace compatibility
   warning, not a load-time gate.
-- Migrating an 11.17.4 database in place to 12.3.1 kept all 21 checks
-  passing; no data work was needed.
+- Migrating an 11.17.4 database in place to 12.3.1 kept all 21 access
+  checks passing; no data work was needed.
 - **Theme overrides need porting.** 12.0.0 dropped the `navigation.*`
   scope for `shell.*`. The overrides here still use `navigation.*`, which
   12 accepts and ignores, so the identity survives — teal logo tile,
@@ -373,9 +395,10 @@ git clone https://github.com/khanahmad4527/enamel && cd enamel
 That is the whole thing: it writes `.env` with a fresh `SECRET`, builds the
 tooth-chart interface, starts Postgres, Redis and Directus, checks the
 licence entitlements, provisions, seeds, and verifies. A clean clone on a
-warm Docker cache reaches a seeded practice passing 21/21 in about 30
-seconds. Re-running is how you pick up a change — every step is idempotent,
-so the second run creates nothing and skips ~200 things.
+warm Docker cache reaches a seeded practice in about 30 seconds, passing
+the 21 access checks that existed when that run was measured. Re-running is
+how you pick up a change — every step is idempotent, so the second run
+creates nothing and skips ~200 things.
 
 On Directus 12 there are exactly two values to set in `.env` first, and the
 script stops and names both if you have not:

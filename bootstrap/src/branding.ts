@@ -121,15 +121,16 @@ const KIT: ReadonlyArray<readonly [file: string, title: string, type: string]> =
 const PUBLIC_NOTE = [
   "**Demo instance.** Every record here is invented.",
   "",
-  // Paragraphs, not a list: the note renders in a narrow column and a
-  // bullet's indent is enough to wrap an email address onto two lines.
-  "Front desk `desk@riverside.example.com`",
+  // Prose, not labelled lines. The note renders in a ~410px column, and
+  // a label beside an email address is wider than that — so "Front desk"
+  // and the address it belonged to landed on separate lines and read as
+  // four unrelated fragments. In a sentence they wrap wherever they like
+  // without coming apart, and the addresses say which is which anyway.
+  `Sign in as \`desk@riverside.example.com\`, then again as \`dentist@riverside.example.com\`. Password \`${DEMO_PASSWORD}\` for both.`,
   "",
-  "Dentist `dentist@riverside.example.com`",
+  "Open the same patient as each. The dentist reads the clinical notes; the front desk never sees that they exist.",
   "",
-  `Both take the password \`${DEMO_PASSWORD}\`.`,
-  "",
-  "Open one patient as each: the dentist reads the clinical notes, the front desk never sees they exist.",
+  "`owner@riverside.example.com` works in Dutch — same instance, four languages.",
 ].join("\n");
 
 /**
@@ -208,6 +209,10 @@ export async function applyBranding(): Promise<void> {
       public_foreground: foreground,
       public_note: PUBLIC_NOTE,
       default_appearance: "dark",
+      // Explicit, not inherited: without it Directus falls back to the
+      // browser's locale, so the same instance greets two people in two
+      // languages before either has signed in.
+      default_language: "en-US",
       theme_light_overrides: light,
       theme_dark_overrides: dark,
       custom_css: CUSTOM_CSS,

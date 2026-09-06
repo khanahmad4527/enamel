@@ -74,6 +74,14 @@ services:
       CACHE_STORE: redis
       REDIS: redis://cache:6379
 
+      # Directus defaults this to false, and the read cache then serves
+      # stale rows after a write until the TTL expires. This repo's whole
+      # loop is "provision, then immediately read back what you
+      # provisioned" — `pnpm verify` did exactly that and reported a flow
+      # as active seconds after the database had it inactive. A test that
+      # cannot see a change cannot fail.
+      CACHE_AUTO_PURGE: "true"
+
       # The official image runs Directus under PM2 in cluster mode, so
       # there is more than one worker. Flow and extension reloads are
       # broadcast between workers over the messenger — without Redis here
