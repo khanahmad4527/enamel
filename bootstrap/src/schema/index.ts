@@ -1,4 +1,5 @@
 import type { Collection } from "../types.js";
+import { withRelatedDisplay } from "./_helpers.js";
 import { clinics, rooms } from "./clinics.js";
 import { patients } from "./patients.js";
 import { appointments } from "./scheduling.js";
@@ -6,7 +7,10 @@ import { treatments, treatmentRecords, toothConditions } from "./clinical.js";
 import { invoices, invoiceLines } from "./billing.js";
 import { documents } from "./documents.js";
 
-export { userFields, fileFields } from "./users.js";
+import { userFields as rawUserFields, fileFields as rawFileFields } from "./users.js";
+
+export const userFields = rawUserFields.map(withRelatedDisplay);
+export const fileFields = rawFileFields.map(withRelatedDisplay);
 
 /** Sidebar folders. Created before the collections that sit in them. */
 export const groups: Collection[] = [
@@ -28,7 +32,7 @@ export const groups: Collection[] = [
  * Order matters: a relation can only be created once both sides exist,
  * so parents come before children.
  */
-export const collections: Collection[] = [
+const declared: Collection[] = [
   clinics,
   rooms,
   patients,
@@ -40,3 +44,8 @@ export const collections: Collection[] = [
   invoices,
   invoiceLines,
 ];
+
+export const collections: Collection[] = declared.map((c) => ({
+  ...c,
+  fields: c.fields.map(withRelatedDisplay),
+}));

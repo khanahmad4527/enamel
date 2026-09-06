@@ -124,3 +124,52 @@ export function validated(
 
 /** Loose but useful: catches typos without rejecting valid odd addresses. */
 export const EMAIL_RE = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$";
+
+/**
+ * Templates for the m2o fields that do not carry one on the interface.
+ * Keyed by field name, because `patient` means the same thing on every
+ * collection it appears on.
+ */
+const RELATED_TEMPLATES: Record<string, string> = {
+  clinic: "{{name}}",
+  patient: "{{last_name}}, {{first_name}}",
+  practitioner: "{{first_name}} {{last_name}}",
+  portal_user: "{{first_name}} {{last_name}}",
+  user_created: "{{first_name}} {{last_name}}",
+  user_updated: "{{first_name}} {{last_name}}",
+  room: "{{name}}",
+  treatment: "{{code}} — {{name}}",
+  appointment: "{{starts_at}}",
+  treatment_record: "{{performed_at}}",
+  invoice: "{{number}}",
+};
+
+/**
+ * Gives every m2o a display as well as an interface.
+ *
+ * `interface` decides what the *form* shows; `display` decides what a
+ * list, a bookmark column or a related-values chip shows. Set one and
+ * not the other — which is the easy mistake, because the form looks
+ * right — and every table in the admin renders a raw uuid where a name
+ * should be. It is the first thing anyone notices and the last thing
+ * anyone thinks to configure.
+ *
+ * Applied centrally rather than field by field: there are seventeen of
+ * them, and the eighteenth would have been forgotten.
+ */
+export function withRelatedDisplay(field: Field): Field {
+  const meta = field.meta as Record<string, unknown> | undefined;
+  if (!meta) return field;
+  const special = meta["special"];
+  const isM2O = Array.isArray(special) && special.includes("m2o");
+  if (!isM2O || meta["display"]) return field;
+
+  const options = (meta["options"] ?? {}) as { template?: string };
+  const template = options.template ?? RELATED_TEMPLATES[field.field];
+  if (!template) return field;
+
+  return {
+    ...field,
+    meta: { ...meta, display: "related-values", display_options: { template } },
+  };
+}

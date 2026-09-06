@@ -174,15 +174,15 @@ separate piece of work, not a `npm publish` away.
 
 | | |
 |---|---|
-| **9 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, invoices, invoice_lines |
+| **10 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
 | **9 global bookmarks** | today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts to review (dentists) |
-| **5 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, flag overdue invoices (nightly) |
+| **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |
 | **1 custom interface** | the FDI tooth chart |
 | **Full branding** | logo, favicon, login screen and admin theme, applied as code |
 | **4 languages** | English, German, Dutch, French — collections, fields, notes, dividers, status labels, bookmark names, and the chart extension's own UI |
 | **Field validations** | FDI tooth numbers, email and phone shapes, non-negative prices, VAT bounds, no future birth dates |
-| **Demo data** | 2 practices, 8 staff + 2 portal logins, 24 patients, 52 appointments, 120 tooth findings, 16 invoices |
+| **Demo data** | 2 practices, 8 staff + 2 portal logins, 24 patients, 52 appointments, 120 tooth findings, 16 invoices, 8 patient documents |
 
 ### Multi-tenancy
 
@@ -196,6 +196,47 @@ const ownClinic = { clinic: { _eq: "$CURRENT_USER.clinic" } };
 Creates are stamped with `presets: { clinic: "$CURRENT_USER.clinic" }`, so a
 user cannot plant a row in someone else's practice either. No application code
 is involved, which means no application code can forget.
+
+### Patient documents, and the file library
+
+Radiographs, referral letters, signed consent and lab reports. The interesting
+part is not the collection — it is that `directus_files` needed a tenant
+boundary of its own, and that getting it wrong is easy in a way worth writing
+down.
+
+The first attempt scoped the `documents` collection by `kind`, so reception saw
+referrals and consent and never a radiograph. It looked right. It was not: a
+document row hands out a file uuid, and `/assets/<uuid>` answers on
+`directus_files` alone. Reception could not see a radiograph in any list and
+could open every one of them by URL. `pnpm verify` caught it on the first run.
+
+The obvious fix does not work either, and the reason is the useful part:
+
+```ts
+// Cannot work. A relational filter inside a permission is evaluated with
+// the caller's own visibility — reception cannot see radiograph documents,
+// so "no radiograph document points at this file" is true for them about
+// every file in the building.
+{ documents: { _none: { kind: { _in: ["radiograph", "photograph", "lab_report"] } } } }
+```
+
+So the marker lives on the file. `directus_files.document_kind` is a plain
+string copied from the document that references it, and reception's permission
+filters on that — no subquery, nothing to evaluate through a permission the
+caller does not have. Two flows keep it in step, one per event shape, and both
+run `permissions: "$full"`, because an event flow inherits the accountability of
+whoever triggered it and no clinician may write a readonly system field. That
+one cost an afternoon: the flow ran, was refused, and left the file open.
+
+What it adds up to, all of it asserted in the suite:
+
+| | |
+|---|---|
+| Front desk | referrals, consent and correspondence. Cannot list a radiograph, cannot open one by URL |
+| Hygienist, dentist, owner | everything in their own practice, images included |
+| Another practice | `403`, on the row and on the asset |
+| A patient | their own consent form and letters — not their own radiographs, and not anyone else's anything |
+| The brand kit | belongs to no practice, stays readable by everyone, or the admin shell loses its own logo |
 
 ### Global bookmarks
 
@@ -255,7 +296,7 @@ future.
 ## Four languages, end to end
 
 <p align="center">
-  <img src="docs/screenshots/admin-de.png" alt="The Enamel admin in German" width="900">
+  <img src="docs/screenshots/admin-nl.png" alt="The Enamel admin in Dutch, as the Riverside practice owner sees it" width="900">
 </p>
 
 English, German, Dutch and French — and not just collection names. Field
