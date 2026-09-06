@@ -1,6 +1,6 @@
 import { login, api } from "./client.js";
 import { log } from "./log.js";
-import { collections, groups, userFields } from "./schema/index.js";
+import { collections, groups, userFields, fileFields } from "./schema/index.js";
 import { policies } from "./access/policies.js";
 import { roles } from "./access/roles.js";
 import { presets } from "./presets.js";
@@ -26,8 +26,9 @@ async function main() {
   log.step("Collections and fields");
   for (const c of collections) await applyCollection(c);
 
-  log.step("Tenancy fields on directus_users");
+  log.step("Tenancy fields on directus_users and directus_files");
   for (const f of userFields) await applyField("directus_users", f);
+  for (const f of fileFields) await applyField("directus_files", f);
 
   log.step("Retired fields");
   await retireFields([["appointments", "reminder_sent_at"]]);
@@ -36,6 +37,20 @@ async function main() {
   await applyRelations(collections);
   // directus_users.clinic can only be linked once clinics exists.
   await applyRelations([
+    {
+      collection: "directus_files",
+      meta: {},
+      fields: [],
+      relations: [
+        {
+          collection: "directus_files",
+          field: "clinic",
+          related_collection: "clinics",
+          meta: {},
+          schema: { on_delete: "SET NULL" },
+        },
+      ],
+    },
     {
       collection: "directus_users",
       meta: {},

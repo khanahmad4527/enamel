@@ -1,4 +1,4 @@
-import { api, must } from "./client.js";
+import { api, must, authHeader } from "./client.js";
 import { log } from "./log.js";
 
 /**
@@ -10,7 +10,51 @@ import { log } from "./log.js";
  * Everything here is invented. Never point this at real patients.
  */
 
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { DEMO_PASSWORD } from "./env.js";
+
+const DEMO_DOCS = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "demo", "documents");
+
+/**
+ * Uploads a demo document into the practice's file library.
+ *
+ * `clinic` is passed explicitly here because the seed runs as admin, and
+ * the preset that stamps it for staff is attached to *their* create
+ * permission, not to an administrator's. Without it every seeded file
+ * would land unscoped and be visible to both practices — which is
+ * exactly the leak the verify suite now checks for.
+ */
+async function uploadDemoFile(
+  file: string,
+  title: string,
+  type: string,
+  clinic: string,
+): Promise<string | null> {
+  const existing = await must<Array<{ id: string }>>(
+    "find demo file",
+    api.get(`/files?limit=1&fields=id&filter[title][_eq]=${encodeURIComponent(title)}`),
+  );
+  if (existing.length && existing[0]) return existing[0].id;
+
+  const bytes = await readFile(join(DEMO_DOCS, file));
+  const form = new FormData();
+  form.append("title", title);
+  form.append("clinic", clinic);
+  form.append("file", new Blob([new Uint8Array(bytes)], { type }), file);
+  const res = await fetch(`${api.url}/files`, {
+    method: "POST",
+    headers: { authorization: authHeader() },
+    body: form,
+  });
+  const body = (await res.json()) as { data?: { id: string }; errors?: unknown };
+  if (!res.ok || !body.data) {
+    log.fail(`upload ${file}: ${JSON.stringify(body.errors ?? body)}`);
+    return null;
+  }
+  return body.data.id;
+}
 
 type Row = { id: string };
 
@@ -279,6 +323,45 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     log.made(`  ${records} treatment records, ${invoiced} invoices`);
 
     // --- one patient-portal login ------------------------------------
+    // --- documents ------------------------------------------------------
+    // Attached to patients[0], which is also the portal patient — so the
+    // consent form below is the one the portal check reads back, and the
+    // radiograph beside it is the one the portal must NOT reach.
+    {
+      const subject = patients[0]!;
+      const docs: Array<[file: string, title: string, type: string, kind: string, day: number, note: string]> = [
+        ["opg-panoramic.png", `${practice.slug} OPG panoramic`, "image/png", "radiograph", -420,
+          "Baseline panoramic taken at the new-patient exam."],
+        ["bitewing-right.png", `${practice.slug} bitewing right`, "image/png", "radiograph", -180,
+          "Right bitewing, recall interval imaging."],
+        ["consent-extraction.txt", `${practice.slug} consent, extraction 46`, "text/plain", "consent", -30,
+          "Signed in surgery before the extraction was booked."],
+        ["referral-orthodontics.txt", `${practice.slug} orthodontic referral`, "text/plain", "referral", -14,
+          "Referred for crowding and a retained deciduous canine."],
+      ];
+      let filed = 0;
+      for (const [file, title, type, kind, day, note] of docs) {
+        const fileId = await uploadDemoFile(file, title, type, clinic.id as string);
+        if (!fileId) continue;
+        // Set here as well as by the flow. The seed is idempotent, so on
+        // a re-run the document already exists and no create event fires
+        // — the classification would then only ever be right on a first
+        // run, which is the sort of thing that works on your machine.
+        await must("classify demo file", api.patch(`/files/${fileId}`, { document_kind: kind }));
+        await findOrCreate<Row>("documents", { clinic: clinic.id, file: fileId }, {
+          clinic: clinic.id,
+          patient: subject.id,
+          file: fileId,
+          kind,
+          taken_on: at(day, 10).slice(0, 10),
+          note,
+          status: "active",
+        });
+        filed++;
+      }
+      log.made(`  ${filed} patient documents`);
+    }
+
     const portalPatient = patients[0]!;
     const portalEmail = `patient@${practice.slug}.example.com`;
     const portalUser = await findOrCreateUser(portalEmail, {

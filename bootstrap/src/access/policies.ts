@@ -42,6 +42,82 @@ const FRONT_DESK_PATIENT_FIELDS = [
 
 const ALL = ["*"];
 
+/**
+ * Which document kinds reception may touch.
+ *
+ * The same argument as FRONT_DESK_PATIENT_FIELDS, one level up: a
+ * receptionist files referral letters and chases signed consent, and has
+ * no business opening a radiograph. Splitting by `kind` rather than by
+ * collection keeps the diary working and the images closed.
+ */
+const ADMIN_DOCUMENT_KINDS = ["referral", "consent", "correspondence"];
+
+/**
+ * Files the signed-in user may see: their own practice's, plus the ones
+ * belonging to no practice — the brand kit, which the admin shell loads
+ * for everybody. Without the null arm, staff get a broken logo.
+ */
+const ownClinicOrShared = {
+  _or: [{ clinic: { _eq: "$CURRENT_USER.clinic" } }, { clinic: { _null: true } }],
+};
+
+/**
+ * `directus_files` is a shared collection with a public asset endpoint,
+ * so the tenant boundary has to be on it directly. Reading a document row
+ * gets you a uuid; reading the file gets you the x-ray.
+ */
+const CLINICAL_DOCUMENT_KINDS = ["radiograph", "photograph", "lab_report"];
+
+/**
+ * The baseline file read, and the thing this whole module got wrong at
+ * first: hiding the *document row* from reception hid the metadata and
+ * not the bytes. `/assets/<uuid>` answers on `directus_files` alone, so
+ * a receptionist who could not see a radiograph in the list could still
+ * open it by URL. The verify suite caught it; nothing else would have.
+ *
+ * The marker is a plain boolean on the file, not a filter through the
+ * document that references it: a relational filter inside a permission is
+ * evaluated with the caller's own visibility, so "no radiograph document
+ * points at this file" was true for reception about every file in the
+ * building. See directus_files.clinical for the whole story.
+ */
+const nonClinicalFiles = {
+  _and: [
+    ownClinicOrShared,
+    {
+      // `_nin` alone would also exclude every unclassified file, because
+      // SQL's NOT IN is null-hostile — and that is the brand kit, every
+      // avatar and every upload that is not a patient document.
+      _or: [
+        { document_kind: { _null: true } },
+        { document_kind: { _nin: CLINICAL_DOCUMENT_KINDS } },
+      ],
+    },
+  ],
+};
+
+const fileAccess: Permission[] = [
+  { collection: "directus_files", action: "read", permissions: nonClinicalFiles, fields: ALL },
+  {
+    collection: "directus_files",
+    action: "create",
+    permissions: {},
+    fields: ALL,
+    // The upload endpoint never sends `clinic`, so the preset is what
+    // stamps it. A user physically cannot upload into another practice.
+    presets: { clinic: "$CURRENT_USER.clinic" },
+  },
+  {
+    collection: "directus_files",
+    action: "update",
+    permissions: { clinic: { _eq: "$CURRENT_USER.clinic" } },
+    fields: ["title", "description", "tags", "folder", "location"],
+  },
+  // Folder names are navigation, not data. Without read here the file
+  // library renders as a flat, unusable list.
+  { collection: "directus_folders", action: "read", permissions: {}, fields: ALL },
+];
+
 /** Read/write a collection, scoped to the user's practice. */
 function crud(
   collection: string,
@@ -81,6 +157,7 @@ const clinicScoped: Policy = {
       permissions: { clinic: { _eq: "$CURRENT_USER.clinic" } },
       fields: ["id", "first_name", "last_name", "email", "avatar", "job_title", "clinic", "status"],
     },
+    ...fileAccess,
   ],
 };
 
@@ -96,7 +173,10 @@ const receptionist: Policy = {
     ...crud("invoices", ["create", "read", "update"]),
     ...crud("invoice_lines", ["create", "read", "update", "delete"]),
     ...readOnly("treatments", ["id", "clinic", "code", "name", "category", "duration_minutes", "default_price", "active"]),
-    // No treatment_records. No tooth_conditions. Deliberate.
+    ...crud("documents", ["create", "read", "update"], ALL, {
+      kind: { _in: ADMIN_DOCUMENT_KINDS },
+    }),
+    // No treatment_records. No tooth_conditions. No radiographs. Deliberate.
   ],
 };
 
@@ -113,6 +193,11 @@ const hygienist: Policy = {
       practitioner: { _eq: "$CURRENT_USER" },
     }),
     ...crud("tooth_conditions", ["create", "read", "update"]),
+    // Directus unions permissions across the policies on a role, so this
+    // widens the Clinic member baseline rather than replacing it: a
+    // clinician reads every file in their practice, radiographs included.
+    { collection: "directus_files", action: "read", permissions: ownClinicOrShared, fields: ALL },
+    ...crud("documents", ["create", "read"]),
     ...readOnly("treatments"),
     // No invoices, no invoice_lines.
   ],
@@ -129,6 +214,11 @@ const dentist: Policy = {
     ...crud("appointments", ["create", "read", "update"]),
     ...crud("treatment_records", ["create", "read", "update", "delete"]),
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
+    // Directus unions permissions across the policies on a role, so this
+    // widens the Clinic member baseline rather than replacing it: a
+    // clinician reads every file in their practice, radiographs included.
+    { collection: "directus_files", action: "read", permissions: ownClinicOrShared, fields: ALL },
+    ...crud("documents", ["create", "read", "update", "delete"]),
     ...crud("treatments", ["create", "read", "update"]),
     ...readOnly("invoices"),
     ...readOnly("invoice_lines"),
@@ -149,6 +239,11 @@ const practiceOwner: Policy = {
     ...crud("treatments", ["create", "read", "update", "delete"]),
     ...crud("treatment_records", ["create", "read", "update", "delete"]),
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
+    // Directus unions permissions across the policies on a role, so this
+    // widens the Clinic member baseline rather than replacing it: a
+    // clinician reads every file in their practice, radiographs included.
+    { collection: "directus_files", action: "read", permissions: ownClinicOrShared, fields: ALL },
+    ...crud("documents", ["create", "read", "update", "delete"]),
     ...crud("invoices", ["create", "read", "update", "delete"]),
     ...crud("invoice_lines", ["create", "read", "update", "delete"]),
     {
@@ -194,6 +289,27 @@ const patientPortal: Policy = {
       action: "read",
       permissions: ownPatientChild,
       fields: ["id", "tooth_fdi", "surface", "condition", "recorded_at"],
+    },
+    {
+      collection: "documents",
+      action: "read",
+      permissions: { _and: [ownPatientChild, { kind: { _in: ["consent", "correspondence"] } }] },
+      fields: ["id", "kind", "taken_on", "note", "file", "date_created"],
+    },
+    {
+      // The row above hands out a file uuid; this is what decides whether
+      // /assets/<uuid> answers. It walks back through the document to the
+      // patient — so a patient reaches the bytes of their own consent
+      // form and of nothing else, not another patient's, and not a
+      // radiograph of their own that they were never granted.
+      collection: "directus_files",
+      action: "read",
+      permissions: {
+        documents: {
+          _and: [ownPatientChild, { kind: { _in: ["consent", "correspondence"] } }],
+        },
+      },
+      fields: ["id", "title", "type", "filesize", "uploaded_on"],
     },
     {
       collection: "invoices",

@@ -35,6 +35,14 @@ async function login(email: string, password = DEMO_PASSWORD): Promise<string> {
   return body.data.access_token;
 }
 
+/** Status only — /assets returns bytes, and the question is whether it answers. */
+async function asset(token: string, id: string): Promise<number> {
+  const res = await fetch(`${BASE}/assets/${id}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  return res.status;
+}
+
 async function get(token: string, path: string) {
   const res = await fetch(`${BASE}${path}`, { headers: { authorization: `Bearer ${token}` } });
   const body = (await res.json().catch(() => ({}))) as {
@@ -158,8 +166,79 @@ async function main() {
   const patientIds = new Set(((portalOthers.data ?? []) as Array<{ patient: string }>).map((a) => a.patient));
   check("portal user sees only their own appointments", patientIds.size <= 1, `${patientIds.size} distinct patients`);
 
+  const admin0 = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+  /* ---------- documents and the file library ------------------------- */
+  // A document row hands out a file uuid. /assets/<uuid> hands out the
+  // x-ray. Both need the boundary, and only one of them is obvious.
+  const deskDocs = await get(desk, "/items/documents?limit=-1&fields=id,kind,file");
+  const deskKinds = new Set(((deskDocs.data ?? []) as Array<{ kind: string }>).map((d) => d.kind));
+  check("front desk sees referrals and consent", deskKinds.has("referral") && deskKinds.has("consent"),
+    [...deskKinds].sort().join(", ") || "nothing");
+  check("front desk CANNOT see radiographs", !deskKinds.has("radiograph"),
+    `${deskKinds.size} kinds visible`);
+
+  const dentistDocs = await get(dds, "/items/documents?limit=-1&fields=id,kind,file,clinic");
+  const dentistRows = (dentistDocs.data ?? []) as Array<{ kind: string; file: string; clinic: string }>;
+  const radiograph = dentistRows.find((d) => d.kind === "radiograph");
+  check("the dentist can see the radiographs", Boolean(radiograph),
+    `${dentistRows.length} documents`);
+
+  if (radiograph) {
+    check("the dentist can open the image itself", (await asset(dds, radiograph.file)) === 200,
+      `HTTP ${await asset(dds, radiograph.file)}`);
+    const deskStatus = await asset(desk, radiograph.file);
+    check("front desk CANNOT open a radiograph by direct asset URL", deskStatus === 403,
+      `HTTP ${deskStatus}`);
+  }
+
+  // Cross-tenant: the other practice's files, fetched by id.
+  const marinaDentist = await login("dentist@marina.example.com");
+  const marinaDocs = await get(marinaDentist, "/items/documents?limit=-1&fields=id,file,clinic");
+  const marinaRows = (marinaDocs.data ?? []) as Array<{ file: string; clinic: string }>;
+  const clinicsSeen = new Set([
+    ...dentistRows.map((d) => d.clinic),
+    ...marinaRows.map((d) => d.clinic),
+  ]);
+  check("each practice sees only its own documents",
+    dentistRows.length > 0 && marinaRows.length > 0 && clinicsSeen.size === 2,
+    `${dentistRows.length} + ${marinaRows.length}, ${clinicsSeen.size} practices`);
+
+  const marinaFile = marinaRows[0]?.file;
+  if (marinaFile) {
+    const leak = await asset(dds, marinaFile);
+    check("a dentist CANNOT open another practice's file", leak === 403, `HTTP ${leak}`);
+  }
+
+  // The brand kit belongs to no practice, and every staff member needs it
+  // or the admin shell renders without its own logo.
+  const settingsLogo = await get(admin0, "/settings?fields=project_logo");
+  const logoId = ((settingsLogo.data ?? {}) as { project_logo?: string }).project_logo;
+  if (logoId) {
+    check("shared brand files stay readable by staff", (await asset(desk, logoId)) === 200,
+      "the nav logo still loads");
+  }
+
+  /* ---------- the portal reaches its own consent, and nothing else ---- */
+  const portalDocs = await get(portal, "/items/documents?limit=-1&fields=id,kind,file");
+  const portalRows = (portalDocs.data ?? []) as Array<{ kind: string; file: string }>;
+  const portalKinds = new Set(portalRows.map((d) => d.kind));
+  check("a patient sees their own consent form", portalKinds.has("consent"),
+    [...portalKinds].join(", ") || "nothing");
+  check("a patient CANNOT see their own radiographs", !portalKinds.has("radiograph"),
+    `${portalRows.length} documents`);
+
+  const consentFile = portalRows.find((d) => d.kind === "consent")?.file;
+  if (consentFile) {
+    check("a patient can open their consent form", (await asset(portal, consentFile)) === 200);
+  }
+  if (radiograph) {
+    const portalLeak = await asset(portal, radiograph.file);
+    check("a patient CANNOT open a radiograph by asset URL", portalLeak === 403, `HTTP ${portalLeak}`);
+  }
+
   /* ================= provisioning ==================================== */
-  const admin = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const admin = admin0;
 
   const rows = async (path: string): Promise<Array<Record<string, unknown>>> => {
     const r = await get(admin, path);
@@ -177,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("9 collections and 2 sidebar folders exist", tables.length === 9 && folders.length === 2,
+  check("10 collections and 2 sidebar folders exist", tables.length === 10 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -235,7 +314,7 @@ async function main() {
   /* ---------- flows ---------------------------------------------------- */
   const flows = await rows("/flows?limit=-1&fields=id,name,status,trigger");
   const inactive = flows.filter((f) => f["status"] !== "active");
-  check("five flows, all active", flows.length === 5 && inactive.length === 0,
+  check("seven flows, all active", flows.length === 7 && inactive.length === 0,
     `${flows.length} flows${inactive.length ? `, ${inactive.length} inactive` : ""}`);
 
   // The bug this catches: an item-update whose key is an item-read result.

@@ -62,6 +62,88 @@ const DUE_SOON = {
 
 const flows: FlowDef[] = [
   {
+    // The create event carries the whole payload, so the file id and the
+    // kind are both already in hand and no read is needed.
+    name: "Classify a filed document",
+    icon: "shield_lock",
+    color: "#0D6E63",
+    description:
+      "Copies a new document's kind onto the file behind it. That copy is what keeps radiographs out of reception's file library — see directus_files.document_kind.",
+    trigger: "event",
+    accountability: "all",
+    options: {
+      type: "action",
+      scope: ["items.create"],
+      collections: ["documents"],
+    },
+    operations: [
+      {
+        key: "classify",
+        name: "Mark the file",
+        type: "item-update",
+        options: {
+          collection: "directus_files",
+          key: "{{$trigger.payload.file}}",
+          payload: { document_kind: "{{$trigger.payload.kind}}" },
+          // As the system, not as whoever filed the document. An event
+          // flow inherits the triggering user's accountability, and no
+          // clinician may write a readonly field on directus_files — so
+          // without this the flow ran, was refused, and left the file
+          // unclassified and readable by reception. It failed silently,
+          // because a rejected operation only ends the chain.
+          permissions: "$full",
+          emitEvents: false,
+        },
+      },
+    ],
+  },
+  {
+    // Split from the create flow for the same reason as the invoice
+    // totals pair: items.update carries `keys` and only the fields that
+    // changed, so the document has to be read back. Re-filing a
+    // radiograph as correspondence has to reopen the file, or a misfiled
+    // document stays hidden for good.
+    name: "Reclassify a refiled document",
+    icon: "shield_lock",
+    color: "#0D6E63",
+    description:
+      "Keeps the file's copy of the document kind in step when a document is edited.",
+    trigger: "event",
+    accountability: "all",
+    options: {
+      type: "action",
+      scope: ["items.update"],
+      collections: ["documents"],
+    },
+    operations: [
+      {
+        key: "doc",
+        name: "Read the document back",
+        type: "item-read",
+        options: {
+          collection: "documents",
+          // A filter rather than `key`, because item-read hands back a
+          // single object when given one key and an array when given
+          // several — and every downstream mustache here indexes with
+          // [0]. A filter always returns a list, whatever the count.
+          query: { filter: { id: { _in: "{{$trigger.keys}}" } }, fields: ["id", "file", "kind"] },
+        },
+      },
+      {
+        key: "classify",
+        name: "Mark the file",
+        type: "item-update",
+        options: {
+          collection: "directus_files",
+          key: "{{doc[0].file}}",
+          payload: { document_kind: "{{doc[0].kind}}" },
+          permissions: "$full",
+          emitEvents: false,
+        },
+      },
+    ],
+  },
+  {
     // Directus has no per-item loop inside a flow. What it has is a
     // `trigger` operation that runs another flow once per element of an
     // array, so the per-patient work lives in its own flow and the
@@ -183,6 +265,11 @@ const flows: FlowDef[] = [
           collection: "invoices",
           key: "{{$trigger.payload.invoice}}",
           payload: { subtotal: "{{sum[0].sum.amount}}" },
+          // Same reason as the classify flows: a hygienist adding a line
+          // has no write on invoices, and the recalculation would be
+          // refused rather than wrong — which is worse, because the
+          // header would simply stay stale.
+          permissions: "$full",
           emitEvents: false,
         },
       },
@@ -218,8 +305,8 @@ const flows: FlowDef[] = [
         type: "item-read",
         options: {
           collection: "invoice_lines",
-          key: "{{$trigger.keys}}",
-          query: { fields: ["invoice"] },
+          // Filter, not key — see "Reclassify a refiled document".
+          query: { filter: { id: { _in: "{{$trigger.keys}}" } }, fields: ["id", "invoice"] },
         },
       },
       {
@@ -242,6 +329,7 @@ const flows: FlowDef[] = [
           collection: "invoices",
           key: "{{line[0].invoice}}",
           payload: { subtotal: "{{sum[0].sum.amount}}" },
+          permissions: "$full",
           emitEvents: false,
         },
       },

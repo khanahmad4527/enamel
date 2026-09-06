@@ -4,8 +4,9 @@ import { patients } from "./patients.js";
 import { appointments } from "./scheduling.js";
 import { treatments, treatmentRecords, toothConditions } from "./clinical.js";
 import { invoices, invoiceLines } from "./billing.js";
+import { documents } from "./documents.js";
 
-export { userFields } from "./users.js";
+export { userFields, fileFields } from "./users.js";
 
 /** Sidebar folders. Created before the collections that sit in them. */
 export const groups: Collection[] = [
@@ -35,6 +36,7 @@ export const collections: Collection[] = [
   treatments,
   treatmentRecords,
   toothConditions,
+  documents,
   invoices,
   invoiceLines,
 ];

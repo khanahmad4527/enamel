@@ -1,0 +1,10 @@
+REFERRAL — DEMONSTRATION DOCUMENT
+
+To: the orthodontic department
+Re: a fictional patient in a demonstration database
+
+Thank you for seeing this patient, who presents with crowding in the upper
+arch and a retained deciduous canine. Radiographs are attached to the
+patient record in Enamel.
+
+This file is fabricated demo data. No real patient is described.

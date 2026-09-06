@@ -110,12 +110,28 @@ export async function applyPolicies(policies: Policy[]): Promise<Map<string, str
 
     // Permissions are replaced wholesale so the file stays the source of
     // truth — editing a filter here and re-running actually takes effect.
+    //
+    // This used to delete by comma-separated path, which Directus answers
+    // with 403, and the result was never checked. So nothing was ever
+    // deleted: each run appended another copy of every rule, and one
+    // policy had reached 61 permissions where it defines 7. Identical
+    // duplicates are harmless — right up until you *narrow* a filter, at
+    // which point Directus ORs the new rule with three stale copies of
+    // the old one and the tightening silently does nothing. Which is how
+    // an access model drifts open.
+    //
+    // The batch form takes the ids in the body, and `must` makes a failed
+    // wipe fatal. A half-replaced permission set is not something to
+    // carry on from.
     const current = await must<Array<{ id: number }>>(
       "list permissions",
       api.get(`/permissions?limit=-1&fields=id&filter[policy][_eq]=${id}`),
     );
     if (current.length) {
-      await api.delete(`/permissions/${current.map((p) => p.id).join(",")}`);
+      await must(
+        `clear permissions on ${policy.name}`,
+        api.delete("/permissions", current.map((p) => p.id)),
+      );
     }
 
     let made = 0;
