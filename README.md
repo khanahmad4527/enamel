@@ -407,10 +407,18 @@ provisioning, and have only been run against an existing instance.
   warning, not a load-time gate.
 - Migrating an 11.17.4 database in place to 12.3.1 kept all 21 access
   checks passing; no data work was needed.
-- **Theme overrides need porting.** 12.0.0 dropped the `navigation.*`
-  scope for `shell.*`. The overrides here still use `navigation.*`, which
-  12 accepts and ignores, so the identity survives — teal logo tile,
-  correct project name — but the nav bar no longer takes the brand colour.
+- **Two theme keys moved, and Directus does not tell you.** An unknown
+  theme key is accepted and ignored, so a stale name looks exactly like a
+  working one — these were silently dead until a screenshot gave them
+  away. `navigation.background` is now `navigation.list.background`, and
+  `navigation.project.background` is gone: the project tile takes
+  `shell.background`, which paints the *entire* shell, so a teal tile
+  costs you a teal application. Corrected against the variables the
+  12.3.1 admin bundle actually emits, with `shell.background` left alone.
+  The custom CSS keeping the project descriptor readable now reads
+  `--theme--navigation--project--foreground` rather than hardcoding white,
+  which was right while the tile was teal and invisible in light mode the
+  moment 12 stopped painting it.
 - **12.3.0 changed Update/Delete Items flow operations**: with empty
   targeting they now return null instead of acting on the whole
   collection. Nothing here depends on that; a flow written against 11

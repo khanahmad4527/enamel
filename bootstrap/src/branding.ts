@@ -136,13 +136,16 @@ const PUBLIC_NOTE = [
 /**
  * One rule, for one genuine gap: the project descriptor in the nav header
  * inherits `--theme--foreground-subdued` (#666672, a grey-mauve), which is
- * unreadable on the teal. There is no theme token scoped to just that
- * element, and raising foregroundSubdued globally would wash out every
- * muted label in the admin. So it is fixed where it breaks, and nowhere
- * else.
+ * too dim against the dark shell to read comfortably.
+ *
+ * It takes its colour from the project foreground the theme already
+ * defines, rather than a hardcoded white — which was correct while the
+ * project tile was teal in both themes and became invisible in light mode
+ * the moment 12 stopped painting that tile.
  */
 const CUSTOM_CSS = `.project-info .descriptor {
-  color: rgba(255, 255, 255, 0.74);
+  color: var(--theme--navigation--project--foreground);
+  opacity: 0.72;
 }`;
 
 /**
@@ -176,8 +179,10 @@ export async function applyBranding(): Promise<void> {
     foregroundAccent: INK,
     background: "#FBFCFC",
     navigation: {
-      background: "#F2F6F5",
-      project: { background: TEAL, foreground: "#FFFFFF" },
+      // `navigation.list`, not `navigation.background` — see the dark
+      // block below for why.
+      list: { background: "#F2F6F5" },
+      project: { foreground: INK },
       modules: { background: INK, button: { foregroundActive: MINT } },
     },
   };
@@ -189,9 +194,27 @@ export async function applyBranding(): Promise<void> {
     foreground: "#DCE8E6",
     foregroundAccent: "#FFFFFF",
     background: "#0F1F1D",
+    /**
+     * Two of these keys moved in Directus 12, and the overrides were
+     * silently ignored until they were corrected — Directus accepts an
+     * unknown theme key and does nothing with it, so a stale name looks
+     * exactly like a working one.
+     *
+     *   navigation.background         -> navigation.list.background
+     *   navigation.project.background -> gone; the project tile now takes
+     *                                    shell.background
+     *
+     * `shell.background` is deliberately not set. It paints the entire
+     * shell — header bar, nav pane and module gutter — so a teal project
+     * tile costs you a teal application. The identity carries on the logo
+     * tile, the nav list and the mint accents instead.
+     *
+     * Verified against the variables the 12.3.1 admin bundle actually
+     * emits, not against the 11 docs.
+     */
     navigation: {
-      background: "#132726",
-      project: { background: TEAL, foreground: "#FFFFFF" },
+      list: { background: "#132726" },
+      project: { foreground: "#FFFFFF" },
       modules: { background: "#0A1716", button: { foregroundActive: MINT } },
     },
   };
