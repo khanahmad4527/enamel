@@ -620,7 +620,7 @@ both standards rather than leaving a reader to assume.
 |---|---|
 | **30 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, clinical_notes, medical_histories, patient_findings, consents, perio (screenings, sextants, exams, teeth, sites), treatment_plans (+ items), recalls (+ types, statuses), payment_plans (+ charges), waiting_list, laboratories, lab_cases, documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
-| **12 global bookmarks** | plans awaiting an answer, recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
+| **12 global bookmarks + 13 default views** | plans awaiting an answer, recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |
 | **1 custom interface** | the FDI tooth chart, with ISO 10394 supernumerary teeth listed beside it |
 | **Full branding** | logo, favicon, login screen and admin theme, applied as code |

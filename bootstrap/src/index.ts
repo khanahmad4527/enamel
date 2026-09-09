@@ -3,7 +3,7 @@ import { log } from "./log.js";
 import { collections, groups, userFields, fileFields } from "./schema/index.js";
 import { policies } from "./access/policies.js";
 import { roles } from "./access/roles.js";
-import { presets } from "./presets.js";
+import { presets, collectionDefaults } from "./presets.js";
 import {
   applyCollection, applyField, applyRelations,
   applyPolicies, applyRoles, applyPresets, retireFields,
@@ -86,6 +86,9 @@ async function main() {
 
   log.step("Global bookmarks");
   await applyPresets(presets, roleIds);
+
+  log.step("Default list layouts");
+  await applyPresets(collectionDefaults, roleIds);
 
   log.step("Flows");
   await applyFlows();

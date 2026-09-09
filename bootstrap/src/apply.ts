@@ -218,15 +218,23 @@ export async function applyPresets(
   presets: Preset[],
   roleIds: Map<string, string>,
 ): Promise<void> {
-  const existing = await must<Array<{ id: number; bookmark: string | null; user: string | null }>>(
+  const existing = await must<Array<{ id: number; bookmark: string | null; user: string | null; role: string | null; collection: string }>>(
     "list presets",
-    api.get("/presets?limit=-1&fields=id,bookmark,user"),
+    api.get("/presets?limit=-1&fields=id,bookmark,user,role,collection"),
   );
   // Only the global ones are ours. A user's own saved bookmark can share
   // a name with one of these, and overwriting somebody's private view
   // because it collides with a shipped one would be its own bug.
   const mine = new Map(
     existing.filter((p) => p.user === null && p.bookmark).map((p) => [p.bookmark as string, p.id]),
+  );
+  // A preset with no bookmark, no role and no user is the collection's
+  // default view. There is at most one per collection, so it is keyed by
+  // collection rather than by name — a name is exactly what it lacks.
+  const defaults = new Map(
+    existing
+      .filter((p) => p.user === null && !p.bookmark && !p.role)
+      .map((p) => [p.collection, p.id]),
   );
 
   for (const preset of presets) {
@@ -256,16 +264,20 @@ export async function applyPresets(
     // edited filter that never reaches an instance already holding the
     // bookmark is the sort of drift that makes people stop trusting the
     // provisioning and start clicking.
-    const id = preset.bookmark ? mine.get(preset.bookmark) : undefined;
+    const id = preset.bookmark ? mine.get(preset.bookmark) : defaults.get(preset.collection);
     if (id !== undefined) {
       const r = await api.patch(`/presets/${id}`, body);
-      if (r.ok) log.skip(`bookmark "${preset.bookmark}"`);
-      else log.fail(`bookmark "${preset.bookmark}" — ${r.error.message}`);
+      const label = preset.bookmark ? `bookmark "${preset.bookmark}"` : `default view for ${preset.collection}`;
+      if (r.ok) log.skip(label);
+      else log.fail(`${label} — ${r.error.message}`);
       continue;
     }
 
     const r = await api.post("/presets", body);
-    if (r.ok) log.made(`bookmark "${preset.bookmark}"${preset.role ? ` (${preset.role} only)` : ""}`);
-    else log.fail(`bookmark "${preset.bookmark}" — ${r.error.message}`);
+    const made = preset.bookmark
+      ? `bookmark "${preset.bookmark}"${preset.role ? ` (${preset.role} only)` : ""}`
+      : `default view for ${preset.collection}`;
+    if (r.ok) log.made(made);
+    else log.fail(`${made} — ${r.error.message}`);
   }
 }

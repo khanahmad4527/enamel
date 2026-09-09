@@ -20,6 +20,85 @@ import type { Preset } from "./types.js";
 
 const w = (widths: Record<string, number>) => ({ tabular: { widths } });
 
+/**
+ * Default list layouts.
+ *
+ * A preset with no bookmark, no role and no user IS the collection's
+ * default view — which matters more than it sounds. Without one, Directus
+ * picks the first few columns it finds, and Lab Cases opened showing
+ * "Appointment, Clinic, Laboratory" with the appointment column empty:
+ * none of the four timestamps that are the entire point of the module,
+ * and none of the instructions. A module can be modelled correctly and
+ * still be useless on the screen where somebody opens it.
+ */
+export const collectionDefaults: Preset[] = [
+  {
+    bookmark: null, collection: "lab_cases", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-sent_at"], fields: ["patient", "instructions", "due_at", "sent_at", "received_at", "checked_at"] } },
+    layout_options: w({ patient: 170, instructions: 300, due_at: 130, sent_at: 130, received_at: 130, checked_at: 130 }),
+  },
+  {
+    bookmark: null, collection: "waiting_list", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["added_on"], fields: ["patient", "added_on", "source", "wanted_from", "status", "priority"] } },
+    layout_options: w({ patient: 180, added_on: 130, source: 200, wanted_from: 140, status: 130 }),
+  },
+  {
+    bookmark: null, collection: "payment_plans", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-agreed_on"], fields: ["patient", "agreed_on", "total_principal", "down_payment", "apr", "payment_amount", "charge_frequency"] } },
+    layout_options: w({ patient: 170, agreed_on: 130, total_principal: 140, down_payment: 130, apr: 90, payment_amount: 140 }),
+  },
+  {
+    bookmark: null, collection: "dentition", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["patient", "designation"], fields: ["patient", "designation", "dentition_type", "state", "absence_reason", "retained"] } },
+    layout_options: w({ patient: 180, designation: 130, dentition_type: 150, state: 130, absence_reason: 150 }),
+  },
+  {
+    bookmark: null, collection: "clinical_notes", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-written_on"], fields: ["written_on", "patient", "kind", "author", "body"] } },
+    layout_options: w({ written_on: 160, patient: 170, kind: 130, author: 160, body: 400 }),
+  },
+  {
+    bookmark: null, collection: "medical_histories", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-taken_on"], fields: ["taken_on", "patient", "anticoagulants", "smoker", "signed_on", "superseded_by"] } },
+    layout_options: w({ taken_on: 130, patient: 180, anticoagulants: 150, smoker: 110, signed_on: 150 }),
+  },
+  {
+    bookmark: null, collection: "patient_findings", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["patient"], fields: ["patient", "category", "label", "severity", "status", "noted_on"] } },
+    layout_options: w({ patient: 180, category: 140, label: 220, severity: 120, status: 120 }),
+  },
+  {
+    bookmark: null, collection: "consents", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-signed_on"], fields: ["patient", "title", "signed_on", "witnessed_by", "signature_invalidated_on"] } },
+    layout_options: w({ patient: 170, title: 320, signed_on: 150, witnessed_by: 170 }),
+  },
+  {
+    bookmark: null, collection: "treatment_plans", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-presented_on"], fields: ["patient", "title", "status", "presented_on", "presented_total", "accepted_total"] } },
+    layout_options: w({ patient: 170, title: 260, status: 120, presented_on: 140, presented_total: 140, accepted_total: 140 }),
+  },
+  {
+    bookmark: null, collection: "recalls", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["date_due"], fields: ["patient", "recall_type", "interval_months", "date_due", "recall_status", "patient_agreed"] } },
+    layout_options: w({ patient: 180, recall_type: 170, interval_months: 120, date_due: 130, recall_status: 160, patient_agreed: 150 }),
+  },
+  {
+    bookmark: null, collection: "perio_screenings", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-examined_on"], fields: ["patient", "examined_on", "instrument", "guideline_version", "examiner"] } },
+    layout_options: w({ patient: 180, examined_on: 140, instrument: 130, guideline_version: 180 }),
+  },
+  {
+    bookmark: null, collection: "perio_exams", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-examined_on"], fields: ["patient", "examined_on", "examiner", "probe_type", "charts_third_molars"] } },
+    layout_options: w({ patient: 180, examined_on: 140, examiner: 170, probe_type: 130 }),
+  },
+  {
+    bookmark: null, collection: "documents", role: null, layout: "tabular",
+    layout_query: { tabular: { sort: ["-taken_on"], fields: ["patient", "kind", "taken_on", "file", "note"] } },
+    layout_options: w({ patient: 180, kind: 160, taken_on: 130, file: 200, note: 320 }),
+  },
+];
+
 export const presets: Preset[] = [
   {
     /**

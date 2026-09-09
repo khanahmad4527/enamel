@@ -207,7 +207,10 @@ export const recalls: Collection = {
         note: "$t:enamel_note_patient_agreed",
         display: "labels",
         display_options: {
-          showAsDot: true,
+          // No `showAsDot` here, unlike the archive statuses. A dot works
+          // when the colour carries the whole meaning; agreed, disagreed
+          // and not discussed are three facts a reader has to be able to
+          // tell apart in a worklist without hovering over them.
           choices: [
             { text: "$t:enamel_ag_agreed", value: "agreed", color: "#2ECDA7" },
             { text: "$t:enamel_ag_disagreed", value: "disagreed", color: "#E35169" },
