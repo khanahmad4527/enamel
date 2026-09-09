@@ -9,6 +9,7 @@ import { dentition } from "./dentition.js";
 import { recallTypes, recallStatuses, recalls } from "./recalls.js";
 import { treatmentPlans, treatmentPlanItems } from "./plans.js";
 import { clinicalNotes, medicalHistories, patientFindings, consents } from "./records.js";
+import { perioScreenings, perioSextants, perioExams, perioTeeth, perioSites } from "./perio.js";
 import { documents } from "./documents.js";
 
 import { userFields as rawUserFields, fileFields as rawFileFields } from "./users.js";
@@ -55,6 +56,11 @@ const declared: Collection[] = [
   recalls,
   documents,
   consents,
+  perioScreenings,
+  perioSextants,
+  perioExams,
+  perioTeeth,
+  perioSites,
   invoices,
   invoiceLines,
 ];

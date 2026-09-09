@@ -170,6 +170,92 @@ Installed anywhere but here it would render an empty chart. Publishing it
 would mean exposing those as interface options first — worth doing, but a
 separate piece of work, not a `npm publish` away.
 
+## Periodontal screening and charting
+
+Two different acts, so two different shapes. A BPE is a **screen** — six
+numbers, thirty seconds — and the BSP is explicit that it "should be used
+for screening only and should not be used for diagnosis" and "cannot be
+used to monitor the response to periodontal therapy". A full chart is six
+measurements per tooth and is what you monitor with. Fold them together
+and you get a screen pretending to be a chart.
+
+### The BPE, and why the version is a column
+
+| | |
+|---|---|
+| **Codes 0–4** | Stored as the clinician recorded them, never recomputed from millimetres |
+| **The asterisk is a second axis** | BSP: "Both the number and the * should be recorded if a furcation is detected. E.g. the score for a sextant could be 3*" — so it is a boolean beside the code, never a fifth value |
+| **Six sextants** | UR 17–14, UA 13–23, UL 24–27, LR 47–44, LA 43–33, LL 34–37, in FDI |
+| **Empty ≠ zero** | A sextant needs at least two teeth to score. Null means not scored, with a reason, because the BSP defines no symbol for it — its own worked example just shows a dash |
+
+`guideline_version` is not bureaucracy. **The asterisk meant total
+attachment loss before 2011 and furcation involvement from 2011.** The
+third-molar rule changed in 2016 (now excluded *unless* the first or second
+molar is missing), and the pre-2016 rule that carried a single remaining
+tooth into the adjoining sextant was dropped. A code from 2009 and a code
+from today are not the same measurement, and without the version you
+cannot tell them apart.
+
+The code is never derived from a probing depth, and the reason is
+uncomfortable: **the BSP's own wording disagrees with itself at exactly
+3.5mm.** The 2011 text says "no pockets >3.5mm" for codes 0–2 while 2019
+says "pockets <3.5mm", and 3.5 falls in the gap. A system that computed
+the code would be inventing a boundary the guideline declines to draw.
+
+### The chart, and the one place a sign error is dangerous
+
+Six sites per tooth — **MB, B, DB, ML, L, DL**. In the maxilla the lingual
+three are the palatal three; that is a label, not a column.
+
+The gingival margin is the single field where an inverted sign produces
+clinically wrong output *in silence*, and both conventions genuinely exist
+in shipping software. So the field is called **`recession_mm`** rather than
+`gingival_margin`, which is the ambiguous name, and the convention is
+stated once and enforced by that name:
+
+```
+recession_mm > 0   margin apical to the CEJ — root exposed
+recession_mm = 0   margin at the CEJ
+recession_mm < 0   margin coronal — overgrowth, pseudopocket
+
+CAL = probing_depth_mm + recession_mm
+```
+
+This matches Eaglesoft ("a positive value between 1-19 when the gum line
+is below the CEJ", "a negative value of 1-10 when the gumline is above"),
+Dentrix and Open Dental, so an import needs no sign flip. A check asserts
+that a receded site reads *deeper* than it probes — which is what fails
+first if anyone flips it.
+
+**CAL is not stored.** It is derived from two columns in the same row, and
+a stored copy is a column that can disagree with its own inputs. Open
+Dental calls its own "auto CAL" and computes it; here any query can.
+
+Three more distinctions that cost nothing to model and everything to
+retrofit:
+
+- **Null is not zero.** A 0mm probing depth is a real if unusual reading;
+  a site that was not probed is a different fact. Open Dental uses `-1` as
+  a sentinel for the same reason — a nullable column says it better.
+- **Mobility is per tooth, never per site.** A tooth moves as a rigid
+  body. A check asserts the site table has no mobility column at all. The
+  four-point scale is stable but its *attribution* is not — the "Miller
+  index" is reported inconsistently and products disagree — so which index
+  a grade belongs to is recorded beside it rather than assumed.
+- **Furcation only exists on multi-rooted teeth, and the entrances differ
+  by tooth.** Mandibular molars have two, buccal and lingual. Maxillary
+  molars have three, opening mesiopalatally and distopalatally. Upper first
+  premolars have two, mesial and distal — which is why they get missed.
+- **`assessed_*` looks like clutter and is not.** A bleeding score of 12%
+  means nothing unless you know how many sites were probed for bleeding. A
+  chart with recession unassessed is a different chart from one where every
+  recession happened to be zero.
+
+The seed makes the clinical story rather than filling a grid: a BPE with
+`4*` in the lower left, and the partial chart that finding obliges —
+because a real chart is not always 192 rows, and assuming it is was the
+mistake worth avoiding.
+
 ## The medico-legal layer
 
 This one replaced something that was wrong: a mutable free-text
@@ -455,7 +541,7 @@ both standards rather than leaving a reader to assume.
 
 | | |
 |---|---|
-| **20 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, clinical_notes, medical_histories, patient_findings, consents, treatment_plans (+ items), recalls (+ types, statuses), documents, invoices, invoice_lines |
+| **25 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, clinical_notes, medical_histories, patient_findings, consents, perio (screenings, sextants, exams, teeth, sites), treatment_plans (+ items), recalls (+ types, statuses), documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
 | **12 global bookmarks** | plans awaiting an answer, recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |

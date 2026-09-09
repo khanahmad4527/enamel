@@ -256,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("20 collections and 2 sidebar folders exist", tables.length === 20 && folders.length === 2,
+  check("25 collections and 2 sidebar folders exist", tables.length === 25 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -331,6 +331,69 @@ async function main() {
     dentitionRows.some((d) => d["absence_reason"] === "congenital") &&
       dentitionRows.some((d) => d["retained"] === true),
     "congenital absence and a retained primary tooth both present");
+
+  /* ---------- periodontal ---------------------------------------------- */
+  const sextantRows = await rows("/items/perio_sextants?limit=-1&fields=sextant,bpe_code,furcation,teeth_scored");
+  check("a BPE covers six sextants", sextantRows.length >= 6,
+    `${sextantRows.length} sextant rows`);
+  check("BPE codes stay inside 0–4",
+    sextantRows.every((r) => r["bpe_code"] === null || (Number(r["bpe_code"]) >= 0 && Number(r["bpe_code"]) <= 4)),
+    "no code outside the guideline");
+  // The asterisk is a second axis, so a sextant must be able to carry
+  // both a code and a furcation at once — 3* in the BSP's own example.
+  check("a sextant can carry a code and a furcation at once",
+    sextantRows.some((r) => r["furcation"] === true && r["bpe_code"] !== null),
+    sextantRows.filter((r) => r["furcation"] === true).map((r) => `${r["sextant"]}=${r["bpe_code"]}*`).join(", "));
+
+  const bogusCode = await post("perio_sextants", {
+    clinic: riverside,
+    screening: ((await rows("/items/perio_screenings?limit=1&fields=id"))[0] ?? {})["id"],
+    sextant: "UR", bpe_code: 5,
+  });
+  check("a fifth BPE code is refused", bogusCode >= 400, `HTTP ${bogusCode}`);
+
+  const siteRows = await rows(
+    "/items/perio_sites?limit=-1&fields=exam,tooth,site,probing_depth_mm,recession_mm,bleeding_on_probing",
+  );
+  // Keyed by exam AND tooth: two practices each hold their own chart, so
+  // tooth 36 legitimately appears twice and grouping on the designation
+  // alone counts twelve sites where there are six.
+  const sitesPerTooth = new Map<string, number>();
+  for (const r of siteRows) {
+    const k = `${r["exam"]}/${r["tooth"]}`;
+    sitesPerTooth.set(k, (sitesPerTooth.get(k) ?? 0) + 1);
+  }
+  check("six sites per charted tooth",
+    sitesPerTooth.size > 0 && [...sitesPerTooth.values()].every((n) => n === 6),
+    `${sitesPerTooth.size} teeth × 6 = ${siteRows.length} sites`);
+
+  // The sign convention, asserted rather than trusted: recession positive,
+  // so CAL = depth + recession and a receded site reads deeper than it
+  // probes. An inverted sign would make CAL smaller than the pocket.
+  const withRecession = siteRows.filter((r) => Number(r["recession_mm"] ?? 0) > 0);
+  const calSane = withRecession.every(
+    (r) => Number(r["probing_depth_mm"]) + Number(r["recession_mm"]) > Number(r["probing_depth_mm"]),
+  );
+  check("recession is positive, so attachment loss exceeds pocket depth",
+    withRecession.length > 0 && calSane,
+    withRecession.length
+      ? `e.g. ${withRecession[0]!["tooth"]}${withRecession[0]!["site"]}: ${withRecession[0]!["probing_depth_mm"]}mm + ${withRecession[0]!["recession_mm"]}mm recession = CAL ${Number(withRecession[0]!["probing_depth_mm"]) + Number(withRecession[0]!["recession_mm"])}mm`
+      : "no recession recorded",
+  );
+
+  // Mobility is a tooth-level fact and must not appear at site level.
+  const siteFields = await rows("/fields/perio_sites");
+  const mobilityAtSite = siteFields.some((f) => String(f["field"]).includes("mobility"));
+  check("mobility is not recorded per site", !mobilityAtSite, "a tooth moves as one body");
+
+  const perioTeethRows = await rows("/items/perio_teeth?limit=-1&fields=tooth,mobility,furcation_buccal,furcation_lingual");
+  const furcated = perioTeethRows.filter((t) => t["furcation_buccal"] !== null);
+  check("furcation is recorded only where a tooth has one",
+    furcated.length > 0 && furcated.every((t) => ["16","17","18","26","27","28","36","37","38","46","47","48","14","24"].includes(String(t["tooth"]))),
+    furcated.map((t) => String(t["tooth"])).join(", ") + " — multi-rooted only");
+
+  const deskPerio = await get(desk, "/items/perio_sites?limit=1");
+  check("front desk CANNOT read a periodontal chart", deskPerio.status === 403, `HTTP ${deskPerio.status}`);
 
   /* ---------- the medico-legal layer ---------------------------------- */
   // Append-only is a property of the permissions, not a convention. No

@@ -276,6 +276,116 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     }
     log.made(`  ${charted} tooth findings`);
 
+    // --- periodontal: a screen, then the chart it triggered -------------
+    {
+      const subject = patients[1]!;
+
+      // A BPE with a code 4 and a furcation, which is exactly the finding
+      // that obliges a full chart — BSP: a code 4 means "assess the need
+      // for more complex treatment".
+      const screening = await findOrCreate<Row>("perio_screenings",
+        { patient: subject.id as string, examined_on: at(-45, 10).slice(0, 10) },
+        {
+          clinic: clinic.id, patient: subject.id, examiner: users.hygienist,
+          examined_on: at(-45, 10).slice(0, 10),
+          instrument: "BPE", guideline_version: "BSP_BPE_2019",
+          note: "Code 4 lower left with a furcation. Full chart taken the same visit.",
+        });
+
+      const sextants: Array<[string, number | null, boolean, string | null, number | null]> = [
+        // sextant, code, furcation, not-scored reason, teeth scored
+        ["UR", 2, false, null, 4],
+        ["UA", 1, false, null, 6],
+        ["UL", 3, false, null, 4],
+        ["LR", 3, false, null, 4],
+        ["LA", 2, false, null, 6],
+        ["LL", 4, true, null, 4],
+      ];
+      let sx = 0;
+      for (const [sextant, code, furcation, reason, teeth] of sextants) {
+        const existing = await must<Row[]>("find sextant",
+          api.get(`/items/perio_sextants?limit=1&filter[screening][_eq]=${screening.id}` +
+                  `&filter[sextant][_eq]=${sextant}`));
+        if (existing.length) continue;
+        const r = await api.post("/items/perio_sextants", {
+          clinic: clinic.id, screening: screening.id, sextant,
+          bpe_code: code, furcation, not_scored_reason: reason, teeth_scored: teeth,
+          third_molar_included: false,
+        });
+        if (r.ok) sx++;
+      }
+
+      // The full chart the code 4 triggered. Two sextants of it — a real
+      // chart is not always 192 sites, and pretending otherwise is the
+      // mistake this model exists to avoid.
+      const exam = await findOrCreate<Row>("perio_exams",
+        { patient: subject.id as string, examined_on: at(-45, 11).slice(0, 10) },
+        {
+          clinic: clinic.id, patient: subject.id, examiner: users.hygienist,
+          examined_on: at(-45, 11).slice(0, 10),
+          probe_type: "who", charts_third_molars: false,
+          assessed_recession: true, assessed_bleeding: true, assessed_plaque: true,
+          assessed_calculus: false, assessed_mobility: true, assessed_furcation: true,
+          note: "Lower left and lower anterior charted in full following the BPE.",
+        });
+
+      const CHART_TEETH = ["34", "35", "36", "37", "43", "42", "41", "31", "32", "33"];
+      const SITES = ["MB", "B", "DB", "ML", "L", "DL"];
+      // Deterministic, and shaped like a real mouth: deep pockets around
+      // the lower left molars, healthy anteriors, recession where you
+      // would expect it.
+      const depthFor = (tooth: string, site: string): number => {
+        const molar = tooth === "36" || tooth === "37";
+        const interproximal = site !== "B" && site !== "L";
+        if (molar) return interproximal ? 6 : 5;
+        if (tooth === "34" || tooth === "35") return interproximal ? 4 : 3;
+        return interproximal ? 3 : 2;
+      };
+      const recessionFor = (tooth: string, site: string): number => {
+        if ((tooth === "36" || tooth === "37") && site === "B") return 2;
+        if (tooth === "43" || tooth === "33") return site === "B" ? 1 : 0;
+        return 0;
+      };
+
+      let teethRows = 0, siteRows = 0;
+      for (const tooth of CHART_TEETH) {
+        const existingTooth = await must<Row[]>("find perio tooth",
+          api.get(`/items/perio_teeth?limit=1&filter[exam][_eq]=${exam.id}&filter[tooth][_eq]=${tooth}`));
+        if (!existingTooth.length) {
+          const molar = tooth === "36" || tooth === "37";
+          const r = await api.post("/items/perio_teeth", {
+            clinic: clinic.id, exam: exam.id, tooth, is_present: true,
+            mobility: molar ? 2 : 0,
+            mobility_index: "miller_lindhe_nyman",
+            // Mandibular molars have two entrances, buccal and lingual —
+            // and only they do, of the teeth charted here.
+            furcation_buccal: molar ? 2 : null,
+            furcation_lingual: tooth === "36" ? 1 : null,
+          });
+          if (r.ok) teethRows++;
+        }
+
+        for (const site of SITES) {
+          const existingSite = await must<Row[]>("find perio site",
+            api.get(`/items/perio_sites?limit=1&filter[exam][_eq]=${exam.id}` +
+                    `&filter[tooth][_eq]=${tooth}&filter[site][_eq]=${site}`));
+          if (existingSite.length) continue;
+          const depth = depthFor(tooth, site);
+          const r = await api.post("/items/perio_sites", {
+            clinic: clinic.id, exam: exam.id, tooth, site,
+            probing_depth_mm: depth,
+            recession_mm: recessionFor(tooth, site),
+            bleeding_on_probing: depth >= 4,
+            suppuration: depth >= 6 && site === "MB",
+            plaque: depth >= 4,
+            calculus: false,
+          });
+          if (r.ok) siteRows++;
+        }
+      }
+      log.made(`  BPE screening (${sx} sextants), chart of ${teethRows} teeth and ${siteRows} sites`);
+    }
+
     // --- the medico-legal layer -----------------------------------------
     {
       const subject = patients[0]!;   // also the portal patient
