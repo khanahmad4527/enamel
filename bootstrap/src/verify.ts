@@ -162,9 +162,25 @@ async function main() {
   const portalRow = (portalNotes.data?.[0] ?? {}) as Record<string, unknown>;
   check("portal user CANNOT read clinical notes", !("clinical_notes" in portalRow) || portalRow.clinical_notes === undefined);
 
+  // This check used to be decoration. It asked for `patient`, which the
+  // portal policy did not grant, so the request 403'd, the result was
+  // empty, and "no more than one distinct patient" passed on nothing at
+  // all. It now asserts the request SUCCEEDS, returns rows, and that
+  // every row belongs to the caller — so deleting the tenant filter
+  // breaks it, which is the entire point of having it.
   const portalOthers = await get(portal, "/items/appointments?limit=-1&fields=id,patient");
-  const patientIds = new Set(((portalOthers.data ?? []) as Array<{ patient: string }>).map((a) => a.patient));
-  check("portal user sees only their own appointments", patientIds.size <= 1, `${patientIds.size} distinct patients`);
+  const portalAppts = (portalOthers.data ?? []) as Array<{ patient: string }>;
+  const patientIds = new Set(portalAppts.map((a) => a.patient));
+  const ownRecord = ((mine.data ?? [])[0] ?? {}) as { id?: string };
+  check(
+    "portal user sees only their own appointments",
+    portalOthers.status === 200 &&
+      portalAppts.length > 0 &&
+      patientIds.size === 1 &&
+      [...patientIds][0] === ownRecord.id,
+    `${portalAppts.length} appointments across ${patientIds.size} patient(s)` +
+      (patientIds.size === 1 && [...patientIds][0] === ownRecord.id ? " — their own" : ""),
+  );
 
   const admin0 = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
 

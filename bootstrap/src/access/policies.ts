@@ -376,7 +376,13 @@ const patientPortal: Policy = {
       collection: "appointments",
       action: "read",
       permissions: ownPatientChild,
-      fields: ["id", "starts_at", "ends_at", "status", "reason", "practitioner", "room"],
+      // `patient` is granted deliberately. A patient knowing their own
+      // record id is not a leak, and without it the verify suite cannot
+      // assert that every appointment they can see is actually theirs —
+      // the check would ask for a denied field, get a 403, and pass on an
+      // empty result. A test that passes because the request failed is
+      // worse than no test.
+      fields: ["id", "patient", "starts_at", "ends_at", "status", "reason", "practitioner", "room"],
     },
     {
       collection: "tooth_conditions",
