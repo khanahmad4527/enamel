@@ -96,19 +96,91 @@ export const divider = (title: string, key: string, icon = "info"): Field => ({
 });
 
 /**
- * FDI two-digit notation is not a contiguous range: 19, 20, 29, 30 and
- * so on do not exist. An `_in` list of the real numbers rejects them,
- * where a `_between 11 and 48` would quietly accept nonsense.
+ * Tooth designations.
+ *
+ * Two standards, and they are deliberately separate. That separation is
+ * the reason this is a `string` column and not the integer it used to be.
+ *
+ * **ISO 3950:2009 / FDI two-digit** covers the teeth a mouth is supposed
+ * to have, and nothing else. First digit is the quadrant — 1–4 permanent,
+ * clockwise from the upper right; 5–8 deciduous. Second digit is the
+ * tooth, 1–8 permanent (central incisor to third molar) and 1–5
+ * deciduous. That is exactly 52 valid codes and not a contiguous range:
+ * 19, 20, 29 and 30 do not exist, so an `_in` list rejects them where a
+ * `_between 11 and 48` would quietly accept nonsense.
+ *
+ * **ISO 10394:2023** covers supernumerary teeth, and exists precisely
+ * because ISO 3950 cannot be stretched to hold them. From its
+ * introduction: "ISO 3950 has assigned a meaning to most of the available
+ * combinations of two digits. As a result, ISO 3950 cannot be [expanded]
+ * to satisfactorily identify supernumerary teeth without introducing
+ * significant changes to its structure." One of its stated design
+ * requirements is that it "does not assign a new meaning to designations
+ * that exist in ISO 3950" — so any scheme that recycles two-digit codes
+ * for extra teeth (19, 29, 2.9) is contrary to the committee's explicit
+ * intent, however often you see it in the wild.
+ *
+ * Letters instead: A1–A8 upper right, B1–B8 upper left, C1–C8 lower left,
+ * D1–D8 lower right, following the same clockwise sweep as ISO 3950's
+ * quadrants. Plus two midline codes — AB in the maxilla, DC in the
+ * mandible. `DC`, not `CD`: the two letters flanking each midline are read
+ * in arch order, and normalising it would be wrong.
+ *
+ * A mesiodens — the commonest supernumerary in the permanent dentition,
+ * sitting between the upper central incisors — is `AB`. Not 11, not 21,
+ * not a flag on tooth 11.
  */
-export const ADULT_FDI = [
-  11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28,
-  31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48,
+export const PERMANENT_FDI = [
+  "11", "12", "13", "14", "15", "16", "17", "18",
+  "21", "22", "23", "24", "25", "26", "27", "28",
+  "31", "32", "33", "34", "35", "36", "37", "38",
+  "41", "42", "43", "44", "45", "46", "47", "48",
 ];
 export const DECIDUOUS_FDI = [
-  51, 52, 53, 54, 55, 61, 62, 63, 64, 65,
-  71, 72, 73, 74, 75, 81, 82, 83, 84, 85,
+  "51", "52", "53", "54", "55", "61", "62", "63", "64", "65",
+  "71", "72", "73", "74", "75", "81", "82", "83", "84", "85",
 ];
-export const ALL_FDI = [...ADULT_FDI, ...DECIDUOUS_FDI];
+
+/**
+ * ISO 10394:2023 supernumerary designations. 34 of them: eight per
+ * quadrant, plus the two midline codes.
+ *
+ * Note what this standard refuses to do, because both refusals shape the
+ * schema. It "does not classify supernumerary teeth as deciduous or
+ * permanent", so there is one code set spanning both dentitions rather
+ * than the 1–4/5–8 split ISO 3950 uses. And "when multiple supernumerary
+ * teeth are present in the same location, the same code is used for the
+ * designation of each of those supernumerary teeth" — so a designation is
+ * NOT unique per tooth. A double mesiodens is two teeth both called AB,
+ * which happens in roughly one in six mesiodens patients, so a
+ * `UNIQUE (patient, designation)` constraint would reject valid records.
+ */
+export const SUPERNUMERARY_ISO10394 = [
+  ...["A", "B", "C", "D"].flatMap((q) => [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `${q}${n}`)),
+  "AB",
+  "DC",
+];
+
+/** Every designation this instance will accept: 52 + 34 = 86. */
+export const ALL_TOOTH_CODES = [
+  ...PERMANENT_FDI,
+  ...DECIDUOUS_FDI,
+  ...SUPERNUMERARY_ISO10394,
+];
+
+/**
+ * A designation alone is ambiguous across notations, which is why every
+ * tooth reference here is documented as ISO rather than left to a
+ * reader's assumption. The US Universal system numbers supernumerary
+ * permanent teeth 51–82 — the same integers ISO 3950 uses for deciduous
+ * teeth. "51" is an upper-right deciduous central incisor in one system
+ * and a supernumerary behind tooth 1 in the other, and nothing in the
+ * value says which.
+ */
+export const TOOTH_CODE_MESSAGE =
+  "Not a valid tooth designation. ISO 3950 for natural teeth " +
+  "(11–18, 21–28, 31–38, 41–48 permanent; 51–55, 61–65, 71–75, 81–85 deciduous), " +
+  "ISO 10394 for supernumerary (A1–A8, B1–B8, C1–C8, D1–D8, AB, DC).";
 
 /** Attaches a validation filter and the message shown when it fails. */
 export function validated(

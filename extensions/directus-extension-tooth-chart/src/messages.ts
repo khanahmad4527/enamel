@@ -19,6 +19,7 @@ export type Messages = {
   loading: string;
   unsavedPatient: string;
   noFindings: string;
+  supernumerary: string;
   noAccess: string;
   loadFailed: string;
   upper: string;
@@ -37,6 +38,7 @@ const en: Messages = {
   loading: "Loading chart…",
   unsavedPatient: "Save the patient first — the chart needs a record to attach findings to.",
   noFindings: "No findings recorded for this tooth.",
+  supernumerary: "Supernumerary teeth (ISO 10394)",
   noAccess: "You don't have access to clinical records.",
   loadFailed: "Could not load the chart.",
   upper: "Upper",
@@ -64,6 +66,7 @@ const de: Messages = {
   loading: "Zahnschema wird geladen…",
   unsavedPatient: "Bitte den Patienten zuerst speichern — das Zahnschema braucht einen Datensatz.",
   noFindings: "Für diesen Zahn sind keine Befunde erfasst.",
+  supernumerary: "Überzählige Zähne (ISO 10394)",
   noAccess: "Sie haben keinen Zugriff auf klinische Daten.",
   loadFailed: "Das Zahnschema konnte nicht geladen werden.",
   upper: "Oberkiefer",
@@ -91,6 +94,7 @@ const nl: Messages = {
   loading: "Tandkaart laden…",
   unsavedPatient: "Sla de patiënt eerst op — de tandkaart heeft een dossier nodig.",
   noFindings: "Geen bevindingen vastgelegd voor deze tand.",
+  supernumerary: "Boventallige tanden (ISO 10394)",
   noAccess: "Je hebt geen toegang tot klinische gegevens.",
   loadFailed: "De tandkaart kon niet worden geladen.",
   upper: "Bovenkaak",
@@ -118,6 +122,7 @@ const fr: Messages = {
   loading: "Chargement du schéma…",
   unsavedPatient: "Enregistrez d'abord le patient — le schéma a besoin d'un dossier.",
   noFindings: "Aucun constat enregistré pour cette dent.",
+  supernumerary: "Dents surnuméraires (ISO 10394)",
   noAccess: "Vous n'avez pas accès aux dossiers cliniques.",
   loadFailed: "Le schéma dentaire n'a pas pu être chargé.",
   upper: "Maxillaire",

@@ -161,12 +161,12 @@ export const presets: Preset[] = [
       tabular: {
         sort: ["-date_created"],
         fields: [
-          "patient", "treatment", "tooth_fdi", "surfaces",
+          "patient", "treatment", "tooth", "surfaces",
           "practitioner", "price", "status", "date_created",
         ],
       },
     },
-    layout_options: w({ patient: 200, treatment: 240, tooth_fdi: 100, surfaces: 120, practitioner: 170, price: 110 }),
+    layout_options: w({ patient: 200, treatment: 240, tooth: 100, surfaces: 120, practitioner: 170, price: 110 }),
     filter: { status: { _eq: "planned" } },
   },
   {
@@ -179,7 +179,7 @@ export const presets: Preset[] = [
     layout_query: {
       tabular: {
         sort: ["-performed_at"],
-        fields: ["performed_at", "patient", "treatment", "tooth_fdi", "practitioner", "price", "status"],
+        fields: ["performed_at", "patient", "treatment", "tooth", "practitioner", "price", "status"],
       },
     },
     layout_options: w({ performed_at: 170, patient: 200, treatment: 240, practitioner: 170 }),

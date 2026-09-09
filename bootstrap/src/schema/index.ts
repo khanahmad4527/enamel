@@ -5,6 +5,7 @@ import { patients } from "./patients.js";
 import { appointments } from "./scheduling.js";
 import { treatments, treatmentRecords, toothConditions } from "./clinical.js";
 import { invoices, invoiceLines } from "./billing.js";
+import { dentition } from "./dentition.js";
 import { documents } from "./documents.js";
 
 import { userFields as rawUserFields, fileFields as rawFileFields } from "./users.js";
@@ -40,6 +41,7 @@ const declared: Collection[] = [
   treatments,
   treatmentRecords,
   toothConditions,
+  dentition,
   documents,
   invoices,
   invoiceLines,

@@ -193,6 +193,7 @@ const hygienist: Policy = {
       practitioner: { _eq: "$CURRENT_USER" },
     }),
     ...crud("tooth_conditions", ["create", "read", "update"]),
+    ...crud("dentition", ["create", "read", "update"]),
     // Directus unions permissions across the policies on a role, so this
     // widens the Clinic member baseline rather than replacing it: a
     // clinician reads every file in their practice, radiographs included.
@@ -214,6 +215,7 @@ const dentist: Policy = {
     ...crud("appointments", ["create", "read", "update"]),
     ...crud("treatment_records", ["create", "read", "update", "delete"]),
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
+    ...crud("dentition", ["create", "read", "update", "delete"]),
     // Directus unions permissions across the policies on a role, so this
     // widens the Clinic member baseline rather than replacing it: a
     // clinician reads every file in their practice, radiographs included.
@@ -239,6 +241,7 @@ const practiceOwner: Policy = {
     ...crud("treatments", ["create", "read", "update", "delete"]),
     ...crud("treatment_records", ["create", "read", "update", "delete"]),
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
+    ...crud("dentition", ["create", "read", "update", "delete"]),
     // Directus unions permissions across the policies on a role, so this
     // widens the Clinic member baseline rather than replacing it: a
     // clinician reads every file in their practice, radiographs included.
@@ -288,7 +291,13 @@ const patientPortal: Policy = {
       collection: "tooth_conditions",
       action: "read",
       permissions: ownPatientChild,
-      fields: ["id", "tooth_fdi", "surface", "condition", "recorded_at"],
+      fields: ["id", "tooth", "surface", "condition", "recorded_at"],
+    },
+    {
+      collection: "dentition",
+      action: "read",
+      permissions: ownPatientChild,
+      fields: ["id", "designation", "dentition_type", "state", "absence_reason", "retained", "assessed_on"],
     },
     {
       collection: "documents",

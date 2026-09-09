@@ -85,9 +85,15 @@ const TREATMENTS = [
   { code: "D7140", name: "Extraction — erupted tooth", category: "surgery", duration_minutes: 30, default_price: 160, requires_tooth: true },
 ] as const;
 
-/** Adult FDI numbering: quadrants 1–4, positions 1–8. */
-const ADULT_TEETH = [11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28,
-                     31,32,33,34,35,36,37,38,41,42,43,44,45,46,47,48] as const;
+/**
+ * Permanent teeth in ISO 3950 notation — strings, because a designation
+ * is a string now: ISO 10394 numbers supernumerary teeth with letters,
+ * so `AB` has to fit the same column as `36`. See ALL_TOOTH_CODES.
+ */
+const ADULT_TEETH = [
+  "11","12","13","14","15","16","17","18","21","22","23","24","25","26","27","28",
+  "31","32","33","34","35","36","37","38","41","42","43","44","45","46","47","48",
+] as const;
 
 const CONDITIONS = ["healthy","healthy","healthy","caries","filled","filled","crown","root_canal","missing"] as const;
 
@@ -260,7 +266,7 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
         await api.post("/items/tooth_conditions", {
           clinic: clinic.id,
           patient: patient.id,
-          tooth_fdi: tooth,
+          tooth,
           surface: k % 3 === 0 ? "O" : "whole",
           condition: pick(CONDITIONS, pi + k),
           recorded_at: at(-((pi % 20) + 1), 11),
@@ -269,6 +275,88 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
       }
     }
     log.made(`  ${charted} tooth findings`);
+
+    // --- dentition: the cases a fixed 32-box chart cannot hold --------
+    //
+    // Four patients, four shapes of mouth. Every one of these is ordinary
+    // in a real practice and unrepresentable in a chart derived from the
+    // date of birth.
+    {
+      const hypodontia = patients[1]!;   // both lower second premolars never formed
+      const mesiodens  = patients[2]!;   // an extra tooth at the upper midline
+      const child      = patients[3]!;   // mixed dentition, mid-transition
+      const retained   = patients[4]!;   // a milk tooth still in place at 47
+
+      type Row2 = {
+        patient: string; designation: string; dentition_type: string; state: string;
+        absence_reason?: string; retained?: boolean; assessed_from?: string; note?: string;
+      };
+      const rows: Row2[] = [
+        // Hypodontia. 35 and 45 are the commonest congenital absentees
+        // after the third molars — 29.9% of affected people. Radiographic,
+        // because you cannot assert never-formed from looking.
+        { patient: hypodontia.id as string, designation: "35", dentition_type: "permanent", state: "absent",
+          absence_reason: "congenital", assessed_from: "radiograph",
+          note: "No successor visible on the OPG. Second primary molar retained above." },
+        { patient: hypodontia.id as string, designation: "45", dentition_type: "permanent", state: "absent",
+          absence_reason: "congenital", assessed_from: "radiograph" },
+        { patient: hypodontia.id as string, designation: "75", dentition_type: "deciduous", state: "present",
+          retained: true, assessed_from: "clinical",
+          note: "Retained because 35 never formed. Sound, no infraocclusion." },
+        { patient: hypodontia.id as string, designation: "38", dentition_type: "permanent", state: "absent",
+          absence_reason: "congenital", assessed_from: "radiograph", note: "Third molar agenesis." },
+
+        // Hyperdontia. A mesiodens is ISO 10394 "AB" — not 11, not 21, and
+        // not a flag on a natural tooth. Two of them here, deliberately:
+        // ISO 10394 reuses one code for multiple teeth in one location, so
+        // this is what a double mesiodens looks like in the data.
+        { patient: mesiodens.id as string, designation: "AB", dentition_type: "supernumerary", state: "present",
+          assessed_from: "clinical", note: "Palatal to 11/21. For extraction before orthodontics." },
+        { patient: mesiodens.id as string, designation: "AB", dentition_type: "supernumerary", state: "unerupted",
+          assessed_from: "radiograph", note: "Second mesiodens, unerupted, lying horizontally." },
+
+        // Mixed dentition. Permanent incisors and first molars through,
+        // deciduous molars still in place, premolars not yet erupted.
+        // Nothing about this is derivable from an age.
+        { patient: child.id as string, designation: "11", dentition_type: "permanent", state: "present", assessed_from: "clinical" },
+        { patient: child.id as string, designation: "21", dentition_type: "permanent", state: "present", assessed_from: "clinical" },
+        { patient: child.id as string, designation: "16", dentition_type: "permanent", state: "present", assessed_from: "clinical" },
+        { patient: child.id as string, designation: "26", dentition_type: "permanent", state: "present", assessed_from: "clinical" },
+        { patient: child.id as string, designation: "54", dentition_type: "deciduous", state: "present", assessed_from: "clinical" },
+        { patient: child.id as string, designation: "55", dentition_type: "deciduous", state: "present", assessed_from: "clinical" },
+        { patient: child.id as string, designation: "14", dentition_type: "permanent", state: "unerupted",
+          assessed_from: "radiograph", note: "Developing normally, not yet through." },
+        { patient: child.id as string, designation: "15", dentition_type: "permanent", state: "unerupted", assessed_from: "radiograph" },
+        { patient: child.id as string, designation: "51", dentition_type: "deciduous", state: "absent",
+          absence_reason: "exfoliated", assessed_from: "history", note: "Shed normally; 11 in its place." },
+
+        // A retained primary tooth in an adult, which is the case that
+        // breaks any model where dentition follows from the patient's age.
+        { patient: retained.id as string, designation: "55", dentition_type: "deciduous", state: "present",
+          retained: true, assessed_from: "clinical", note: "Still functional at 47. Successor 15 never formed." },
+        { patient: retained.id as string, designation: "15", dentition_type: "permanent", state: "absent",
+          absence_reason: "congenital", assessed_from: "radiograph" },
+      ];
+
+      let teeth = 0;
+      for (const [ri, r] of rows.entries()) {
+        // Matched on the note as well as the designation, because two AB
+        // rows for one patient are legitimate and must both survive.
+        const existing = await must<Row[]>("find dentition",
+          api.get(`/items/dentition?limit=1&filter[patient][_eq]=${r.patient}` +
+                  `&filter[designation][_eq]=${encodeURIComponent(r.designation)}` +
+                  `&filter[state][_eq]=${r.state}`));
+        if (existing.length) continue;
+        const made = await api.post("/items/dentition", {
+          clinic: clinic.id,
+          assessed_on: at(-((ri % 24) + 1), 9).slice(0, 10),
+          ...r,
+        });
+        if (made.ok) teeth++;
+        else log.fail(`dentition ${r.designation}: ${made.error.message}`);
+      }
+      log.made(`  ${teeth} dentition records across 4 patients`);
+    }
 
     // --- treatment records + invoices ---------------------------------
     let records = 0, invoiced = 0;
@@ -285,7 +373,7 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
         patient: patient.id,
         treatment: treatment.id,
         practitioner: i % 2 === 0 ? users.dentist! : users.owner!,
-        tooth_fdi: meta.requires_tooth ? pick(ADULT_TEETH, i * 4) : null,
+        tooth: meta.requires_tooth ? pick(ADULT_TEETH, i * 4) : null,
         surfaces: meta.requires_tooth ? (i % 2 === 0 ? "O" : "M,O") : null,
         performed_at: at(-((i % 12) + 1), 10),
         price: meta.default_price,

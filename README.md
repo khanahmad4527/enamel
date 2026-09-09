@@ -170,15 +170,116 @@ Installed anywhere but here it would render an empty chart. Publishing it
 would mean exposing those as interface options first — worth doing, but a
 separate piece of work, not a `npm publish` away.
 
+## Fewer teeth, more teeth, and neither
+
+A chart with 32 boxes for an adult and 20 for a child, chosen from the date
+of birth, is wrong in three separate directions. This is the part of the
+project I would want a dentist to read.
+
+### Fewer
+
+Tooth agenesis is ordinary. Excluding third molars, pooled prevalence of
+hypodontia is around 6% of people; the third molars themselves are absent
+in **23%**. Among affected people the commonest absentees are the
+mandibular second premolars — 35 and 45 — at **29.9%**, then the maxillary
+lateral incisors (12, 22) at 24.3%, then the maxillary second premolars
+(15, 25) at 13.7%. About 42% are missing exactly one tooth.
+[Polder et al. 2004](https://doi.org/10.1111/j.1600-0528.2004.00158.x),
+third molars excluded.
+
+And *why* it is absent is a different fact from *whether*, with
+consequences. ICD-10-CM K00.0 carries an Excludes1 against K08.1-, meaning
+congenital absence and acquired absence must never both be coded. An
+insurer's missing-tooth clause turns the answer into money. A paper chart
+puts one X through the tooth and loses all of it.
+
+### More
+
+Supernumerary teeth do not fit in FDI notation at all, and the reason is
+worth quoting. ISO 10394:2023, introduction:
+
+> ISO 3950 has assigned a meaning to most of the available combinations of
+> two digits. As a result, ISO 3950 cannot be [expanded] to satisfactorily
+> identify supernumerary teeth without introducing significant changes to
+> its structure.
+
+One of its stated design requirements is that it "does not assign a new
+meaning to designations that exist in ISO 3950" — so the schemes you meet
+in the wild that recycle two-digit codes for extra teeth (19, 29, 2.9) are
+contrary to the committee's explicit intent.
+
+ISO 10394 uses letters instead: **A1–A8** upper right, **B1–B8** upper
+left, **C1–C8** lower left, **D1–D8** lower right, plus two midline codes —
+**AB** in the maxilla and **DC** in the mandible. `DC`, not `CD`: the
+letters flanking each midline are read in arch order. A mesiodens, the
+commonest supernumerary in the permanent dentition, is `AB`. Not 11, not
+21, not a flag on tooth 11.
+
+Two consequences land directly in the schema:
+
+- The standard "does not classify supernumerary teeth as deciduous or
+  permanent", so there is one code set spanning both dentitions rather
+  than FDI's 1–4 / 5–8 split.
+- "When multiple supernumerary teeth are present in the same location, the
+  same code is used for the designation of each of those supernumerary
+  teeth." A designation is **not unique**. A double mesiodens is two teeth
+  both called AB, and `UNIQUE (patient, designation)` would reject a real
+  mouth. There is no such constraint here, and a check asserts that the
+  second AB is accepted.
+
+Which is also why the column is a `string`. It used to be an `integer`,
+and an integer cannot hold `AB`.
+
+### Neither
+
+Age does not tell you which dentition a tooth belongs to. Eruption timing
+varies enough that deriving it would misclassify a large fraction of
+perfectly normal children, and a retained primary molar in a forty-year-old
+is still charted with its primary designation. Real products agree on this
+by disagreeing with each other: Open Dental derives dentition from nothing,
+Dentrix uses an exclusive per-position toggle a clinician sets by hand, and
+Carestream SoftDent carries both a primary and a permanent tooth at the
+twenty succedaneous positions — only twenty, because the twelve permanent
+molars have no primary predecessor to replace.
+
+So [`dentition`](bootstrap/src/schema/dentition.ts) is recorded state, one
+row per tooth somebody has actually looked at. `present`, `unerupted` and
+`absent` are three states rather than two — an unerupted tooth is *there*,
+and charting it as missing throws away the finding the radiograph was taken
+for. Absence carries a reason. A deciduous tooth carries whether it is
+retained. And every row carries when it was assessed and from what, because
+a tooth cannot be called never-formed before the age it would have begun to
+calcify: the date is what separates a finding from a guess.
+
+The absence of a row means "not assessed", which is not the same as "not
+there" — a distinction the radiograph is entitled to make and the calendar
+is not.
+
+The seed ships four mouths that a fixed chart cannot hold: bilateral
+agenesis of 35 and 45 with the primary molar retained above, a double
+mesiodens (one erupted, one lying horizontally), a child mid-transition
+with permanent incisors through and premolars still developing, and a
+47-year-old with a sound deciduous 55 because 15 never formed.
+
+### The notation trap
+
+A bare two-digit tooth code is ambiguous, and the collision is nastier than
+it looks. The US Universal system numbers supernumerary permanent teeth
+**51–82** — the same integers ISO 3950 uses for deciduous teeth. `51` is an
+upper-right deciduous central incisor in one system and a supernumerary
+behind tooth 1 in the other, and nothing in the value says which. Every
+tooth reference here is documented as ISO, and the validation message names
+both standards rather than leaving a reader to assume.
+
 ## What's in the box
 
 | | |
 |---|---|
-| **10 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, documents, invoices, invoice_lines |
+| **11 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
 | **9 global bookmarks** | today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts to review (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |
-| **1 custom interface** | the FDI tooth chart |
+| **1 custom interface** | the FDI tooth chart, with ISO 10394 supernumerary teeth listed beside it |
 | **Full branding** | logo, favicon, login screen and admin theme, applied as code |
 | **4 languages** | English, German, Dutch, French — collections, fields, notes, dividers, status labels, bookmark names, and the chart extension's own UI |
 | **Field validations** | FDI tooth numbers, email and phone shapes, non-negative prices, VAT bounds, no future birth dates |
@@ -317,6 +418,10 @@ Labels are keyed by field name rather than `collection.field`, because
 `patient`, `status` and `notes` mean the same thing everywhere they appear —
 translated once, applied wherever they occur. 55 keys across 4 languages —
 220 rows — plus 11 collection names and 89 field labels.
+
+<p align="center">
+  <img src="docs/screenshots/tooth-chart-nl.png" alt="The tooth chart in Dutch, including a supernumerary tooth" width="900">
+</p>
 
 `$t:` reaches less than you would hope, and the boundary is worth knowing
 before you design around it. Tested against 12.3.1, these four render the

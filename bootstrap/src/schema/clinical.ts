@@ -1,5 +1,5 @@
 import type { Collection } from "../types.js";
-import { pk, timestamps, status, clinicRef, divider, ALL_FDI } from "./_helpers.js";
+import { pk, timestamps, status, clinicRef, divider, ALL_TOOTH_CODES, TOOTH_CODE_MESSAGE } from "./_helpers.js";
 
 /** Catalogue of billable procedures. */
 export const treatments: Collection = {
@@ -78,7 +78,7 @@ export const treatmentRecords: Collection = {
     icon: "history_edu",
     note: "Clinical record of work performed. Invisible to front-desk policies.",
     color: "#0D6E63",
-    display_template: "{{treatment.name}} — {{tooth_fdi}}",
+    display_template: "{{treatment.name}} — {{tooth}}",
     sort: 4,
     group: "clinical",
   },
@@ -111,14 +111,17 @@ export const treatmentRecords: Collection = {
     },
     divider("$t:enamel_div_tooth", "divider_tooth", "dentistry"),
     {
-      field: "tooth_fdi",
-      type: "integer",
+      // A string, not an integer: ISO 10394 designates supernumerary
+      // teeth with letters, so `AB` (a mesiodens) has to fit in the same
+      // column as `36`. See ALL_TOOTH_CODES.
+      field: "tooth",
+      type: "string",
       meta: {
         interface: "input", width: "half",
-        note: "$t:enamel_note_tooth_fdi",
-        // FDI skips 19, 20, 29 and so on, so an explicit list beats a range.
-        validation: { _or: [{ tooth_fdi: { _null: true } }, { tooth_fdi: { _in: ALL_FDI } }] },
-        validation_message: "Not a valid FDI tooth number (11–18, 21–28, 31–38, 41–48 adult; 51–85 deciduous).",
+        note: "$t:enamel_note_tooth",
+        options: { placeholder: "36" },
+        validation: { _or: [{ tooth: { _null: true } }, { tooth: { _in: ALL_TOOTH_CODES } }] },
+        validation_message: TOOTH_CODE_MESSAGE,
       },
       schema: {},
     },
@@ -183,7 +186,7 @@ export const toothConditions: Collection = {
     icon: "dentistry",
     note: "Append-only findings per tooth. The chart interface reads this.",
     color: "#0D6E63",
-    display_template: "{{tooth_fdi}} — {{condition}}",
+    display_template: "{{tooth}} — {{condition}}",
     sort: 5,
     group: "clinical",
   },
@@ -197,12 +200,14 @@ export const toothConditions: Collection = {
       schema: { is_nullable: false },
     },
     {
-      field: "tooth_fdi",
-      type: "integer",
+      field: "tooth",
+      type: "string",
       meta: {
-        interface: "input", required: true, width: "half", note: "FDI notation.",
-        validation: { tooth_fdi: { _in: ALL_FDI } },
-        validation_message: "Not a valid FDI tooth number.",
+        interface: "input", required: true, width: "half",
+        note: "$t:enamel_note_tooth",
+        options: { placeholder: "36" },
+        validation: { tooth: { _in: ALL_TOOTH_CODES } },
+        validation_message: TOOTH_CODE_MESSAGE,
       },
       schema: { is_nullable: false },
     },

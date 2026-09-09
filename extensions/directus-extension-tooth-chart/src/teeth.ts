@@ -76,7 +76,12 @@ export const CONDITION_STYLE: Record<Condition, ConditionStyle> = {
 
 export type Finding = {
   id: string;
-  tooth_fdi: number;
+  /**
+   * A designation, not a number. ISO 3950 gives natural teeth two digits;
+   * ISO 10394 gives supernumerary teeth letters — a mesiodens is "AB" —
+   * and both land in this one field.
+   */
+  tooth: string;
   surface: string | null;
   condition: Condition;
   recorded_at: string | null;
@@ -88,14 +93,24 @@ export type Finding = {
  * recent entry. Keeping history rather than mutating a row is what lets
  * a chart show change over time.
  */
-export function latestByTooth(findings: Finding[]): Map<number, Finding> {
-  const out = new Map<number, Finding>();
+export function latestByTooth(findings: Finding[]): Map<string, Finding> {
+  const out = new Map<string, Finding>();
   for (const f of findings) {
-    const current = out.get(f.tooth_fdi);
-    if (!current) { out.set(f.tooth_fdi, f); continue; }
+    const current = out.get(f.tooth);
+    if (!current) { out.set(f.tooth, f); continue; }
     const a = f.recorded_at ?? "";
     const b = current.recorded_at ?? "";
-    if (a >= b) out.set(f.tooth_fdi, f);
+    if (a >= b) out.set(f.tooth, f);
   }
   return out;
+}
+
+/**
+ * ISO 10394 designations begin with a letter, and there is nowhere on an
+ * arch to draw them: a supernumerary tooth has no position in ISO 3950's
+ * grid, which is the whole reason it needed a standard of its own. They
+ * are listed beside the chart instead of being silently dropped.
+ */
+export function isSupernumerary(designation: string): boolean {
+  return /^[A-D]/.test(designation);
 }

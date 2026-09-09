@@ -12,6 +12,7 @@ import { seed } from "./seed.js";
 import { applyFlows } from "./flows.js";
 import { applyBranding } from "./branding.js";
 import { applyTranslations } from "./i18n/apply.js";
+import { runMigrations } from "./migrations.js";
 
 async function main() {
   const wantSeed = process.argv.includes("--seed");
@@ -19,6 +20,11 @@ async function main() {
   log.step(`Connecting to ${api.url}`);
   await login();
   log.info("authenticated as admin");
+
+  // Before the schema step, because its job is to make a column that
+  // changes shape survive data that already exists.
+  log.step("Migrations");
+  await runMigrations();
 
   log.step("Sidebar groups");
   for (const g of groups) await applyCollection(g);
@@ -31,7 +37,12 @@ async function main() {
   for (const f of fileFields) await applyField("directus_files", f);
 
   log.step("Retired fields");
-  await retireFields([["appointments", "reminder_sent_at"]]);
+  await retireFields([
+    ["appointments", "reminder_sent_at"],
+    // Was an integer, and an integer cannot hold "AB".
+    ["tooth_conditions", "tooth_fdi"],
+    ["treatment_records", "tooth_fdi"],
+  ]);
 
   log.step("Relations");
   await applyRelations(collections);

@@ -256,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("10 collections and 2 sidebar folders exist", tables.length === 10 && folders.length === 2,
+  check("11 collections and 2 sidebar folders exist", tables.length === 11 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -264,10 +264,73 @@ async function main() {
   const badTooth = await fetch(`${BASE}/items/tooth_conditions`, {
     method: "POST",
     headers: { authorization: `Bearer ${admin}`, "content-type": "application/json" },
-    body: JSON.stringify({ tooth_fdi: 19, condition: "caries" }),
+    body: JSON.stringify({ tooth: "19", condition: "caries" }),
   });
   check("an impossible FDI number is refused by the schema", badTooth.status >= 400,
     `HTTP ${badTooth.status}`);
+
+  /* ---------- tooth designations, both standards ---------------------- */
+  const post = async (collection: string, body: unknown): Promise<number> => {
+    const res = await fetch(`${BASE}/items/${collection}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${admin}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.status;
+  };
+
+  const riverside = ((await rows("/items/clinics?limit=1&fields=id"))[0] ?? {})["id"];
+  const somePatient = ((await rows("/items/patients?limit=1&fields=id"))[0] ?? {})["id"];
+
+  // ISO 10394 letters must be accepted where ISO 3950 digits are — this is
+  // the whole reason the column is a string.
+  // Tagged so the suite can take them back out again. A test that leaves
+  // rows behind is a test that changes the thing it is measuring — run it
+  // ten times and the dentition counts stop meaning anything.
+  const PROBE = "verify-probe";
+  const supernumerary = await post("dentition", {
+    clinic: riverside, patient: somePatient, designation: "AB",
+    dentition_type: "supernumerary", state: "present", note: PROBE,
+  });
+  check("a mesiodens can be recorded at all", supernumerary === 200, `HTTP ${supernumerary}`);
+
+  // And the same designation twice for one patient, because ISO 10394
+  // reuses a code for multiple teeth in one location.
+  const twice = await post("dentition", {
+    clinic: riverside, patient: somePatient, designation: "AB",
+    dentition_type: "supernumerary", state: "unerupted", note: PROBE,
+  });
+  check("a second tooth may share that designation", twice === 200, `HTTP ${twice}`);
+
+  const bogus = await post("dentition", {
+    clinic: riverside, patient: somePatient, designation: "19",
+    dentition_type: "permanent", state: "present",
+  });
+  check("a designation that exists in no standard is refused", bogus >= 400, `HTTP ${bogus}`);
+
+  const probes = (await rows(`/items/dentition?limit=-1&fields=id&filter[note][_eq]=${PROBE}`))
+    .map((r) => String(r["id"]));
+  if (probes.length) {
+    const res = await fetch(`${BASE}/items/dentition`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${admin}`, "content-type": "application/json" },
+      body: JSON.stringify(probes),
+    });
+    check("the suite cleans up after itself", res.status === 204 || res.status === 200,
+      `${probes.length} probe rows removed`);
+  }
+
+  const dentitionRows = await rows("/items/dentition?limit=-1&fields=designation,dentition_type,state,absence_reason,retained");
+  const kinds = new Set(dentitionRows.map((d) => String(d["dentition_type"])));
+  const states = new Set(dentitionRows.map((d) => String(d["state"])));
+  check("all three dentitions are represented", kinds.size === 3,
+    [...kinds].sort().join(", "));
+  check("present, unerupted and absent are all in use", states.size === 3,
+    [...states].sort().join(", "));
+  check("a tooth that never formed is distinguishable from one taken out",
+    dentitionRows.some((d) => d["absence_reason"] === "congenital") &&
+      dentitionRows.some((d) => d["retained"] === true),
+    "congenital absence and a retained primary tooth both present");
 
   /* ---------- branding ------------------------------------------------ */
   const settings = await one(

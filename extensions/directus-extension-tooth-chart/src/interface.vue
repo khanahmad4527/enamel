@@ -79,6 +79,22 @@
         </div>
       </div>
 
+      <div v-if="extraTeeth.length" class="extras">
+        <span class="extras-title">{{ m.supernumerary }}</span>
+        <button
+          v-for="f in extraTeeth"
+          :key="f.id"
+          type="button"
+          class="extra"
+          :style="{ background: (CONDITION_STYLE[f.condition] ?? CONDITION_STYLE.healthy).fill,
+                    color: (CONDITION_STYLE[f.condition] ?? CONDITION_STYLE.healthy).text,
+                    borderColor: (CONDITION_STYLE[f.condition] ?? CONDITION_STYLE.healthy).stroke }"
+          :title="`${f.tooth} — ${conditionLabel(f.condition)}`"
+        >
+          {{ f.tooth }}<small>{{ conditionLabel(f.condition) }}</small>
+        </button>
+      </div>
+
       <div class="legend">
         <span v-for="(s, key) in CONDITION_STYLE" :key="key" class="legend-item">
           <i
@@ -117,7 +133,7 @@ import { useI18nSafe } from "./i18n";
 import { useApi } from "@directus/extensions-sdk";
 import {
   UPPER_ARCH, LOWER_ARCH, CONDITION_STYLE, toothAnatomy, toothWidth,
-  latestByTooth, type Finding, type Condition,
+  latestByTooth, isSupernumerary, type Finding, type Condition,
 } from "./teeth";
 import { messagesFor } from "./messages";
 
@@ -171,8 +187,23 @@ const CROWN_DOWN =
 
 const current = computed(() => latestByTooth(findings.value));
 
+/**
+ * Findings on supernumerary teeth. There is no box to draw them in — an
+ * extra tooth has no ISO 3950 position, which is why ISO 10394 exists —
+ * so they are listed under the arches. Dropping them would be worse: a
+ * mesiodens is usually the reason a chart is being looked at.
+ */
+const extraTeeth = computed(() =>
+  [...current.value.values()]
+    .filter((f) => isSupernumerary(f.tooth))
+    .sort((a, b) => a.tooth.localeCompare(b.tooth)),
+);
+
 function conditionOf(fdi: number): Condition {
-  return (current.value.get(fdi)?.condition ?? "healthy") as Condition;
+  // The arch is numbered by ISO 3950, so its positions are numbers; the
+  // log is keyed by designation, which is a string because ISO 10394
+  // designations are letters. One `String()` at the boundary.
+  return (current.value.get(String(fdi))?.condition ?? "healthy") as Condition;
 }
 
 function styleFor(fdi: number) {
@@ -181,7 +212,7 @@ function styleFor(fdi: number) {
 
 function historyFor(fdi: number): Finding[] {
   return findings.value
-    .filter((f) => f.tooth_fdi === fdi)
+    .filter((f) => f.tooth === String(fdi))
     .sort((a, b) => (b.recorded_at ?? "").localeCompare(a.recorded_at ?? ""));
 }
 
@@ -205,7 +236,7 @@ async function load() {
       params: {
         limit: -1,
         sort: "-recorded_at",
-        fields: ["id", "tooth_fdi", "surface", "condition", "recorded_at", "notes"],
+        fields: ["id", "tooth", "surface", "condition", "recorded_at", "notes"],
         filter: { patient: { _eq: patientId.value } },
       },
     });
@@ -280,6 +311,36 @@ watch(patientId, load);
 }
 
 .midline { height: 1px; background: var(--line); margin: 14px 0; }
+
+.extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+.extras-title {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--theme--foreground-subdued);
+  margin-right: 4px;
+}
+.extra {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+}
+.extra small {
+  font-weight: 400;
+  opacity: 0.85;
+}
 
 .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--theme--foreground-subdued, #7a8b99); }
