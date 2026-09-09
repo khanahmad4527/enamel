@@ -256,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("16 collections and 2 sidebar folders exist", tables.length === 16 && folders.length === 2,
+  check("20 collections and 2 sidebar folders exist", tables.length === 20 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -331,6 +331,57 @@ async function main() {
     dentitionRows.some((d) => d["absence_reason"] === "congenital") &&
       dentitionRows.some((d) => d["retained"] === true),
     "congenital absence and a retained primary tooth both present");
+
+  /* ---------- the medico-legal layer ---------------------------------- */
+  // Append-only is a property of the permissions, not a convention. No
+  // policy grants update on notes, histories or consents — including the
+  // owner's — so nothing can rewrite them.
+  const notePerms = await rows("/permissions?limit=-1&fields=collection,action,policy");
+  const rewritable = notePerms.filter(
+    (p) => ["clinical_notes", "medical_histories", "consents"].includes(String(p["collection"])) &&
+      ["update", "delete"].includes(String(p["action"])),
+  );
+  check("nothing can rewrite a note, a history or a consent", rewritable.length === 0,
+    rewritable.length ? rewritable.map((r) => `${r["collection"]}:${r["action"]}`).join(", ") : "no update or delete rules exist");
+
+  const noteRows = await rows("/items/clinical_notes?limit=-1&fields=id,kind,amends,amendment_reason,locked_on");
+  const amendments = noteRows.filter((n) => n["kind"] === "amendment" && n["amends"]);
+  check("a correction is a new entry pointing at the original", amendments.length > 0,
+    `${amendments.length} amendment(s) of ${noteRows.length} entries`);
+  check("amendments carry a reason", amendments.every((a) => Boolean(a["amendment_reason"])));
+
+  const histories = await rows("/items/medical_histories?limit=-1&fields=id,patient,taken_on,superseded_by");
+  const superseded = histories.filter((h) => h["superseded_by"]);
+  check("an updated history supersedes rather than overwrites", superseded.length > 0,
+    `${superseded.length} superseded, ${histories.length} kept in total`);
+
+  const findingRows = await rows("/items/patient_findings?limit=-1&fields=id,category,label,status,severity");
+  check("an allergy withdrawn on review goes inactive, not away",
+    findingRows.some((f) => f["status"] === "inactive"),
+    `${findingRows.filter((f) => f["status"] === "inactive").length} inactive of ${findingRows.length}`);
+
+  const consentRows = await rows("/items/consents?limit=-1&fields=id,signed_on,data_fingerprint");
+  check("a signed consent is bound to what it signed",
+    consentRows.length > 0 && consentRows.every((c) => Boolean(c["data_fingerprint"])),
+    `${consentRows.length} consent(s) fingerprinted`);
+
+  // Reception sees that an allergy exists — a penicillin allergy on the
+  // day list is safety — and nothing clinical behind it.
+  const deskAlerts = await get(desk, "/items/patient_findings?limit=-1&fields=id,category,label,status");
+  check("front desk sees that an allergy exists", deskAlerts.status === 200 && (deskAlerts.data ?? []).length > 0,
+    `${(deskAlerts.data ?? []).length} visible`);
+  const deskSeverity = await get(desk, "/items/patient_findings?limit=1&fields=id,severity,note");
+  check("front desk CANNOT read the severity or the note", deskSeverity.status === 403,
+    `HTTP ${deskSeverity.status}`);
+  const deskNotes = await get(desk, "/items/clinical_notes?limit=1");
+  check("front desk CANNOT read clinical notes at all", deskNotes.status === 403, `HTTP ${deskNotes.status}`);
+  const deskHistory = await get(desk, "/items/medical_histories?limit=1");
+  check("front desk CANNOT read the medical history", deskHistory.status === 403, `HTTP ${deskHistory.status}`);
+
+  const portalConsent = await get(portal, "/items/consents?limit=-1&fields=id,title,risks_discussed");
+  check("a patient can read the consent they signed",
+    portalConsent.status === 200 && (portalConsent.data ?? []).length > 0,
+    `${(portalConsent.data ?? []).length} consent(s)`);
 
   /* ---------- treatment plans and case acceptance --------------------- */
   const planRows = await rows(

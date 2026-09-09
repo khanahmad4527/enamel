@@ -8,6 +8,7 @@ import { invoices, invoiceLines } from "./billing.js";
 import { dentition } from "./dentition.js";
 import { recallTypes, recallStatuses, recalls } from "./recalls.js";
 import { treatmentPlans, treatmentPlanItems } from "./plans.js";
+import { clinicalNotes, medicalHistories, patientFindings, consents } from "./records.js";
 import { documents } from "./documents.js";
 
 import { userFields as rawUserFields, fileFields as rawFileFields } from "./users.js";
@@ -44,12 +45,16 @@ const declared: Collection[] = [
   treatmentRecords,
   toothConditions,
   dentition,
+  medicalHistories,
+  patientFindings,
+  clinicalNotes,
   treatmentPlans,
   treatmentPlanItems,
   recallTypes,
   recallStatuses,
   recalls,
   documents,
+  consents,
   invoices,
   invoiceLines,
 ];

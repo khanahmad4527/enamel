@@ -276,6 +276,108 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     }
     log.made(`  ${charted} tooth findings`);
 
+    // --- the medico-legal layer -----------------------------------------
+    {
+      const subject = patients[0]!;   // also the portal patient
+      const other = patients[8] ?? patients[1]!;
+
+      // Two histories for one patient, the older superseded by the newer,
+      // because the point of the model is that the first one survives.
+      const h1 = await findOrCreate<Row>("medical_histories",
+        { patient: subject.id as string, taken_on: at(-400, 10).slice(0, 10) },
+        {
+          clinic: clinic.id, patient: subject.id, taken_on: at(-400, 10).slice(0, 10),
+          pregnant: "no", smoker: "yes", anticoagulants: "no",
+          summary: "Well. Smokes 10/day. No regular medication.",
+          signed_on: at(-400, 11),
+        });
+      const h2 = await findOrCreate<Row>("medical_histories",
+        { patient: subject.id as string, taken_on: at(-30, 10).slice(0, 10) },
+        {
+          clinic: clinic.id, patient: subject.id, taken_on: at(-30, 10).slice(0, 10),
+          pregnant: "no", smoker: "no", anticoagulants: "yes",
+          summary: "Stopped smoking. Started apixaban after an AF diagnosis — bleeding risk noted.",
+          signed_on: at(-30, 11),
+        });
+      if (!(h1 as Record<string, unknown>)["superseded_by"]) {
+        await api.patch(`/items/medical_histories/${h1.id}`, { superseded_by: h2.id });
+      }
+
+      // Current-state findings, including one that turned out to be wrong
+      // and is inactive rather than gone.
+      const findings = [
+        { patient: subject.id, category: "allergy", label: "Penicillin", status: "active",
+          severity: "severe", note: "Facial swelling as a child. Avoid all penicillins." },
+        { patient: subject.id, category: "medication", label: "Apixaban 5mg twice daily", status: "active",
+          note: "Started after AF diagnosis. Liaise before extractions." },
+        { patient: subject.id, category: "problem", label: "Atrial fibrillation", status: "active" },
+        { patient: subject.id, category: "allergy", label: "Latex", status: "inactive",
+          severity: "mild", note: "Reported in 2019, not reproducible on review. Kept for the record." },
+        { patient: other.id, category: "allergy", label: "Articaine", status: "active", severity: "moderate" },
+      ];
+      let found = 0;
+      for (const f of findings) {
+        const existing = await must<Row[]>("find finding",
+          api.get(`/items/patient_findings?limit=1&filter[patient][_eq]=${f.patient}` +
+                  `&filter[label][_eq]=${encodeURIComponent(f.label)}`));
+        if (existing.length) continue;
+        const r = await api.post("/items/patient_findings", {
+          clinic: clinic.id, noted_on: at(-120, 10).slice(0, 10), ...f,
+        });
+        if (r.ok) found++;
+      }
+
+      // Notes, including an amendment that corrects an earlier entry
+      // rather than editing it.
+      const original = await findOrCreate<Row>("clinical_notes",
+        { patient: subject.id as string, written_on: at(-30, 11) },
+        {
+          clinic: clinic.id, patient: subject.id, author: users.dentist,
+          written_on: at(-30, 11), kind: "examination",
+          body: "Routine examination. BPE 1/1/1 upper, 2/1/2 lower. Advised on interdental cleaning. " +
+                "Amalgam 36 sound. No caries detected.",
+          locked_on: at(-30, 12),
+        });
+      const amendment = await must<Row[]>("find amendment",
+        api.get(`/items/clinical_notes?limit=1&filter[amends][_eq]=${original.id}`));
+      if (!amendment.length) {
+        await api.post("/items/clinical_notes", {
+          clinic: clinic.id, patient: subject.id, author: users.dentist,
+          written_on: at(-29, 9), kind: "amendment", amends: original.id,
+          amendment_reason: "Tooth number transposed in the entry above",
+          body: "Correction to the entry of the previous day: the sound amalgam is 46, not 36. " +
+                "36 is unrestored. The original entry stands as written.",
+          locked_on: at(-29, 10),
+        });
+      }
+
+      // Consent, with the fingerprint that ties the signature to the text.
+      const consentExists = await must<Row[]>("find consent",
+        api.get(`/items/consents?limit=1&filter[patient][_eq]=${subject.id}`));
+      let consents = 0;
+      if (!consentExists.length) {
+        const risks = "Post-operative swelling, bruising and bleeding — the latter raised by apixaban, " +
+          "which was discussed with the patient's GP. Dry socket. Temporary altered sensation of the " +
+          "lower lip in a small number of cases.";
+        const alternatives = "Root canal treatment and a crown. No treatment, with the likely course explained.";
+        // A cheap deterministic stand-in for a real hash: enough to make
+        // the point that the signature is bound to the text it signed.
+        let hash = 0;
+        for (const ch of risks + alternatives) hash = (hash * 31 + ch.charCodeAt(0)) % 2147483647;
+        const r = await api.post("/items/consents", {
+          clinic: clinic.id, patient: subject.id,
+          title: "Surgical extraction, lower right first molar (46)",
+          risks_discussed: risks,
+          alternatives_discussed: alternatives,
+          signed_on: at(-28, 10),
+          witnessed_by: users.hygienist,
+          data_fingerprint: `sha-stub:${hash.toString(16)}`,
+        });
+        if (r.ok) consents++;
+      }
+      log.made(`  2 medical histories, ${found} findings, notes with an amendment, ${consents} consent`);
+    }
+
     // --- treatment plans ------------------------------------------------
     //
     // Four plans that make the acceptance arithmetic visible: one accepted

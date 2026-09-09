@@ -170,6 +170,72 @@ Installed anywhere but here it would render an empty chart. Publishing it
 would mean exposing those as interface options first — worth doing, but a
 separate piece of work, not a `npm publish` away.
 
+## The medico-legal layer
+
+This one replaced something that was wrong: a mutable free-text
+`clinical_notes` field on the patient, which is exactly the shape
+record-keeping guidance rules out.
+
+Worth getting the citation right, because the internet gets it wrong. The
+**GDC** requires records to be "contemporaneous, complete and accurate"
+(standard 4.1) and requires amendments to be "clearly marked up and dated"
+(4.1.5) — but Principle 4 says nothing at all about deletion. The
+append-only requirement comes from **FGDP(UK)**, which asks for "a full
+audit trail facility... to prevent the overwriting, erasure or corruption
+of data", entries signed off and locked, and — where a correction cannot be
+made before locking — "an entry should be inserted as soon as any error is
+discovered, drawing attention to the original entry and error", with void
+entries remaining printable.
+
+So notes are **entries, never edits**. A correction is a new entry that
+points at the one it corrects, carries a reason, and leaves the original
+legible. That is the paper convention — a single line through the error,
+initialled — expressed as a schema. The seed ships a real one: an
+examination note with a transposed tooth number, and the amendment the
+next morning that says so without touching it.
+
+And append-only is enforced rather than agreed: **no policy grants
+`update` or `delete` on notes, histories or consents — including the
+practice owner's** — and a check asserts that no such rule exists. It is
+the one place in this project where the owner is deliberately not
+omnipotent.
+
+### Medical history is two things
+
+A **signed snapshot** on a date, and the **current state** a clinician
+acts on. Both, not one. Updating a history does not edit it — it produces
+a new dated copy for the patient to sign, and FGDP 8.9.1 is blunt about
+why: "The system should NOT delete the previous medical history." The seed
+has a patient whose history changed materially — stopped smoking, started
+apixaban after an AF diagnosis — and both versions survive, the older one
+pointing forward to its replacement.
+
+The current state lives in `patient_findings`: allergies, medications and
+conditions as filterable rows rather than a paragraph, each with a
+two-state status. An allergy withdrawn on review goes **inactive, not
+away**, because the fact that it was once believed is part of the record.
+Answers are three-valued — yes, no, **unknown** — because unknown is what
+changes the plan for an extraction, not a missing value.
+
+Reception sees *that* a patient has an active allergy, because a
+penicillin allergy on the day list is safety. They cannot read its
+severity, its note, any clinical note, or any history — and requesting one
+of those fields by name returns 403 rather than quietly omitting it.
+
+### Consent stores the answers, not the PDF
+
+The instinct is to keep the document you printed. Open Dental does the
+opposite and is right: it retains the structured answers with a signature
+"electronically linked to the data it applies to", and the signature is
+**invalidated if that data changes**. A rendered PDF cannot do that — it
+goes stale in silence, and you find out during a complaint.
+
+So `data_fingerprint` binds the signature to the text it signed. Change the
+risks that were discussed and the fingerprint no longer matches, which
+marks the signature invalid instead of leaving it attached to something
+else. Linkage to a treatment plan is optional, not intrinsic, because a
+consent form only carries procedures when its template asks for them.
+
 ## Treatment planning, and why one number is a lie
 
 A treatment plan is not a filter over procedures with a "planned" status —
@@ -389,7 +455,7 @@ both standards rather than leaving a reader to assume.
 
 | | |
 |---|---|
-| **16 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, treatment_plans (+ items), recalls (+ types, statuses), documents, invoices, invoice_lines |
+| **20 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, clinical_notes, medical_histories, patient_findings, consents, treatment_plans (+ items), recalls (+ types, statuses), documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
 | **12 global bookmarks** | plans awaiting an answer, recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |

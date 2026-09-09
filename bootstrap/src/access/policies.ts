@@ -187,6 +187,14 @@ const receptionist: Policy = {
     // procedures on it; proposing treatment is a clinical act.
     ...readOnly("treatment_plans"),
     ...readOnly("treatment_plan_items"),
+    // Reception sees THAT a patient has an active allergy — they book and
+    // greet, and a penicillin allergy on the day list is safety, not
+    // clinical detail. They do not get the note, the severity or anything
+    // in the history.
+    ...readOnly("patient_findings", ["id", "clinic", "patient", "category", "label", "status"], {
+      status: { _eq: "active" },
+    }),
+    // No clinical_notes. No medical_histories. No consents. Deliberate.
     // No treatment_records. No tooth_conditions. No radiographs. Deliberate.
   ],
 };
@@ -208,6 +216,10 @@ const hygienist: Policy = {
     ...crud("recalls", ["create", "read", "update"]),
     ...crud("treatment_plans", ["create", "read", "update"]),
     ...crud("treatment_plan_items", ["create", "read", "update"]),
+    ...crud("clinical_notes", ["create", "read"]),
+    ...crud("medical_histories", ["create", "read"]),
+    ...crud("patient_findings", ["create", "read", "update"]),
+    ...crud("consents", ["create", "read"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
@@ -235,6 +247,14 @@ const dentist: Policy = {
     ...crud("recalls", ["create", "read", "update", "delete"]),
     ...crud("treatment_plans", ["create", "read", "update", "delete"]),
     ...crud("treatment_plan_items", ["create", "read", "update", "delete"]),
+    // Create and read, never update or delete. An append-only record is
+    // append-only because nothing can rewrite it, not because everyone
+    // agrees not to — so no policy grants update on notes, histories or
+    // consents, including the practice owner's.
+    ...crud("clinical_notes", ["create", "read"]),
+    ...crud("medical_histories", ["create", "read"]),
+    ...crud("patient_findings", ["create", "read", "update", "delete"]),
+    ...crud("consents", ["create", "read"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
@@ -266,6 +286,14 @@ const practiceOwner: Policy = {
     ...crud("recalls", ["create", "read", "update", "delete"]),
     ...crud("treatment_plans", ["create", "read", "update", "delete"]),
     ...crud("treatment_plan_items", ["create", "read", "update", "delete"]),
+    // Create and read, never update or delete. An append-only record is
+    // append-only because nothing can rewrite it, not because everyone
+    // agrees not to — so no policy grants update on notes, histories or
+    // consents, including the practice owner's.
+    ...crud("clinical_notes", ["create", "read"]),
+    ...crud("medical_histories", ["create", "read"]),
+    ...crud("patient_findings", ["create", "read", "update", "delete"]),
+    ...crud("consents", ["create", "read"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
@@ -318,6 +346,18 @@ const patientPortal: Policy = {
       action: "read",
       permissions: ownPatientChild,
       fields: ["id", "tooth", "surface", "condition", "recorded_at"],
+    },
+    {
+      collection: "consents",
+      action: "read",
+      permissions: ownPatientChild,
+      fields: ["id", "title", "risks_discussed", "alternatives_discussed", "signed_on"],
+    },
+    {
+      collection: "medical_histories",
+      action: "read",
+      permissions: ownPatientChild,
+      fields: ["id", "taken_on", "pregnant", "smoker", "anticoagulants", "signed_on"],
     },
     {
       collection: "treatment_plans",
