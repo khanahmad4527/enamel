@@ -176,6 +176,13 @@ const receptionist: Policy = {
     ...crud("documents", ["create", "read", "update"], ALL, {
       kind: { _in: ADMIN_DOCUMENT_KINDS },
     }),
+    // Reception owns the chase — booking, contacting, marking a status —
+    // so this is the one clinical-adjacent collection they write freely.
+    // Setting the interval is a clinical decision, but recording that the
+    // patient was rung is not.
+    ...crud("recalls", ["create", "read", "update"]),
+    ...readOnly("recall_types"),
+    ...readOnly("recall_statuses"),
     // No treatment_records. No tooth_conditions. No radiographs. Deliberate.
   ],
 };
@@ -194,6 +201,9 @@ const hygienist: Policy = {
     }),
     ...crud("tooth_conditions", ["create", "read", "update"]),
     ...crud("dentition", ["create", "read", "update"]),
+    ...crud("recalls", ["create", "read", "update"]),
+    ...readOnly("recall_types"),
+    ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
     // widens the Clinic member baseline rather than replacing it: a
     // clinician reads every file in their practice, radiographs included.
@@ -216,6 +226,9 @@ const dentist: Policy = {
     ...crud("treatment_records", ["create", "read", "update", "delete"]),
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
     ...crud("dentition", ["create", "read", "update", "delete"]),
+    ...crud("recalls", ["create", "read", "update", "delete"]),
+    ...readOnly("recall_types"),
+    ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
     // widens the Clinic member baseline rather than replacing it: a
     // clinician reads every file in their practice, radiographs included.
@@ -242,6 +255,9 @@ const practiceOwner: Policy = {
     ...crud("treatment_records", ["create", "read", "update", "delete"]),
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
     ...crud("dentition", ["create", "read", "update", "delete"]),
+    ...crud("recalls", ["create", "read", "update", "delete"]),
+    ...readOnly("recall_types"),
+    ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
     // widens the Clinic member baseline rather than replacing it: a
     // clinician reads every file in their practice, radiographs included.
@@ -292,6 +308,12 @@ const patientPortal: Policy = {
       action: "read",
       permissions: ownPatientChild,
       fields: ["id", "tooth", "surface", "condition", "recorded_at"],
+    },
+    {
+      collection: "recalls",
+      action: "read",
+      permissions: ownPatientChild,
+      fields: ["id", "recall_type", "interval_months", "date_due", "date_scheduled"],
     },
     {
       collection: "dentition",

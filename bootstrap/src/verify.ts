@@ -256,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("11 collections and 2 sidebar folders exist", tables.length === 11 && folders.length === 2,
+  check("14 collections and 2 sidebar folders exist", tables.length === 14 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -332,6 +332,51 @@ async function main() {
       dentitionRows.some((d) => d["retained"] === true),
     "congenital absence and a retained primary tooth both present");
 
+  /* ---------- recall, and what NICE requires of it -------------------- */
+  const someType = ((await rows("/items/recall_types?limit=1&fields=id"))[0] ?? {})["id"];
+
+  // NICE CG19 assigns intervals in 3-month steps. Five months is not a
+  // recall interval anywhere in the guidance.
+  const oddInterval = await post("recalls", {
+    clinic: riverside, patient: somePatient, recall_type: someType, interval_months: 5,
+  });
+  check("an off-guidance recall interval is refused", oddInterval >= 400, `HTTP ${oddInterval}`);
+
+  const recallRows = await rows(
+    "/items/recalls?limit=-1&fields=id,interval_months,patient_agreed,date_due,date_due_calculated,is_disabled,disable_until",
+  );
+  check("recalls exist across the interval range", recallRows.length >= 8,
+    `${recallRows.length} recalls`);
+
+  const agreements = new Set(recallRows.map((r) => String(r["patient_agreed"])));
+  check("the patient's agreement with the interval is recorded", agreements.has("disagreed"),
+    [...agreements].sort().join(", "));
+
+  const movedOnPurpose = recallRows.filter((r) => r["date_due"] !== r["date_due_calculated"]);
+  check("a due date moved on purpose stays distinguishable from the calculated one",
+    movedOnPurpose.length > 0, `${movedOnPurpose.length} recall(s) seen early or late deliberately`);
+
+  const suppressed = recallRows.filter((r) => r["is_disabled"] === true || r["disable_until"]);
+  check("a recall can be suppressed without being deleted", suppressed.length >= 2,
+    `${suppressed.length} suppressed`);
+
+  // Reception runs the chase, so this is the one clinical-adjacent
+  // collection they write. The interval is a clinical decision; recording
+  // that somebody was rung is not.
+  const deskRecalls = await get(desk, "/items/recalls?limit=1");
+  check("front desk can work the recall list", deskRecalls.status === 200, `HTTP ${deskRecalls.status}`);
+
+  const portalRecalls = await get(portal, "/items/recalls?limit=-1&fields=id,date_due,date_scheduled");
+  check("a patient can see when they are due",
+    portalRecalls.status === 200 && (portalRecalls.data ?? []).length > 0,
+    `${(portalRecalls.data ?? []).length} recall(s), HTTP ${portalRecalls.status}`);
+
+  // Asking for a denied field by name is refused outright rather than
+  // silently omitted — same behaviour as front desk and medical_alerts.
+  const portalNote = await get(portal, "/items/recalls?limit=1&fields=id,note");
+  check("a patient CANNOT read the recall's internal note", portalNote.status === 403,
+    `HTTP ${portalNote.status}`);
+
   /* ---------- branding ------------------------------------------------ */
   const settings = await one(
     "/settings?fields=project_name,project_color,project_logo,public_favicon," +
@@ -371,7 +416,7 @@ async function main() {
   const presets = (await rows("/presets?limit=-1&fields=id,bookmark,collection,user"))
     .filter((p) => p["user"] === null && p["bookmark"]);
   const unresolved = presets.filter((p) => !String(p["bookmark"]).startsWith("$t:"));
-  check("nine global bookmarks, all translated", presets.length === 9 && unresolved.length === 0,
+  check("eleven global bookmarks, all translated", presets.length === 11 && unresolved.length === 0,
     `${presets.length} bookmarks`);
 
   /* ---------- flows ---------------------------------------------------- */

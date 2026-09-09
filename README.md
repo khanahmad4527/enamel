@@ -170,6 +170,62 @@ Installed anywhere but here it would render an empty chart. Publishing it
 would mean exposing those as interface options first — worth doing, but a
 separate piece of work, not a `npm publish` away.
 
+## Recall, and the field everyone forgets
+
+The module a dentist looks for first and hobby schemas leave out, because
+it is the commercial heart of a practice: who is due, who is overdue, who
+has been chased and how. Three collections, and every division comes from
+how real products behave rather than from taste.
+
+**The interval is not a free number.** NICE CG19, verbatim: "the patient
+should be assigned a recall interval of 3, 6, 9 or 12 months if he or she
+is younger than 18 years, or 3, 6, 9, 12, 15, 18, 21 or 24 months if he or
+she is aged 18 years or older." So the domain is 3-month steps, floor 3,
+ceiling 24 — and 12 for under-18s, which is an age-conditional bound the
+field validation cannot express, so the message says so instead of
+pretending. The US has no equivalent: the ADA states of periodontal
+maintenance that "no time frame is outlined in the CDT", and the
+3-month convention is payer practice, not a standard. A US deployment
+should relax this rule, not copy it.
+
+**The field everyone forgets.** NICE again: "The dentist should discuss the
+recommended recall interval with the patient and record this interval, *and
+the patient's agreement or disagreement with it*." Three values, not a
+nullable boolean — "not discussed" is a different fact from "disagreed",
+and a null in a two-valued column makes the reader guess which. One seeded
+patient asked for annual reviews against clinical advice, and the record
+says so.
+
+**Two due dates, on purpose.** Open Dental distinguishes a calculated due
+date — previous visit plus interval — from an actual one that "typically
+matches the calculated due date but can be manually adjusted". Collapse
+them and you lose the ability to say *this patient is being seen early,
+deliberately*. A check asserts the two differ on the recall that was
+brought forward three weeks.
+
+**Status is the practice's vocabulary, not mine.** Open Dental stores it as
+a foreign key into a user-editable list, and its shipped examples are
+contact attempts: "Mailed postcard", "Texted". A `CHECK` enum here would be
+a guess about somebody else's workflow, so `recall_statuses` is a
+collection. Same for `recall_types` — practices invent their own kinds. The
+one closed axis is the *special type*, which has exactly four values
+because it drives behaviour: a child prophylaxis series is not
+interchangeable with an adult one.
+
+**Three ways to suppress, none of them delete.** A patient who moved away,
+one mid-treatment, and one in arrears are all excluded from a recall run:
+`is_disabled`, `disable_until` a date, and `disable_until_balance_under` an
+amount. The history stays, because they may come back. Both worklist
+bookmarks honour all three in their filters rather than in application
+code — "overdue" is `date_due` against `$NOW`, resolved per request, never
+a stored state.
+
+What the platform would not do: keeping the calculated due date in step
+needs `previous + interval`, and a Directus flow cannot add an interval to
+a date. There is no arithmetic without the script operation, and that
+operation is inert in this image. In production it would be a generated
+column; here the writer sets it, and the code says why.
+
 ## Fewer teeth, more teeth, and neither
 
 A chart with 32 boxes for an adult and 20 for a child, chosen from the date
@@ -275,9 +331,9 @@ both standards rather than leaving a reader to assume.
 
 | | |
 |---|---|
-| **11 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, documents, invoices, invoice_lines |
+| **14 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, recalls (+ types, statuses), documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
-| **9 global bookmarks** | today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts to review (dentists) |
+| **11 global bookmarks** | recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |
 | **1 custom interface** | the FDI tooth chart, with ISO 10394 supernumerary teeth listed beside it |
 | **Full branding** | logo, favicon, login screen and admin theme, applied as code |

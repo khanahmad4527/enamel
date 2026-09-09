@@ -22,6 +22,59 @@ const w = (widths: Record<string, number>) => ({ tabular: { widths } });
 
 export const presets: Preset[] = [
   {
+    /**
+     * The worklist a practice actually runs on. "Overdue" is a filter, not
+     * a stored state — date_due against $NOW, resolved per request — and
+     * the suppression fields are honoured here rather than in application
+     * code: a patient who has moved away or owes money simply does not
+     * appear.
+     */
+    bookmark: "$t:enamel_bm_recalls_overdue",
+    collection: "recalls",
+    role: null,
+    icon: "notification_important",
+    color: "#E35169",
+    layout: "tabular",
+    layout_query: {
+      tabular: {
+        sort: ["date_due"],
+        fields: ["patient", "recall_type", "date_due", "date_previous", "recall_status", "patient_agreed"],
+      },
+    },
+    layout_options: w({ patient: 200, recall_type: 170, date_due: 130, date_previous: 130, recall_status: 160 }),
+    filter: {
+      _and: [
+        { date_due: { _lt: "$NOW" } },
+        { date_scheduled: { _null: true } },
+        { is_disabled: { _eq: false } },
+        { _or: [{ disable_until: { _null: true } }, { disable_until: { _lt: "$NOW" } }] },
+      ],
+    },
+  },
+  {
+    bookmark: "$t:enamel_bm_recalls_due",
+    collection: "recalls",
+    role: null,
+    icon: "event_upcoming",
+    color: "#0D6E63",
+    layout: "tabular",
+    layout_query: {
+      tabular: {
+        sort: ["date_due"],
+        fields: ["patient", "recall_type", "date_due", "recall_status"],
+      },
+    },
+    layout_options: w({ patient: 200, recall_type: 170, date_due: 130, recall_status: 160 }),
+    filter: {
+      _and: [
+        { date_due: { _gte: "$NOW" } },
+        { date_due: { _lte: "$NOW(+60 days)" } },
+        { date_scheduled: { _null: true } },
+        { is_disabled: { _eq: false } },
+      ],
+    },
+  },
+  {
     bookmark: "$t:enamel_bm_todays_diary",
     collection: "appointments",
     role: null,

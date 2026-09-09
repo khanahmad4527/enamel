@@ -276,6 +276,106 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     }
     log.made(`  ${charted} tooth findings`);
 
+    // --- recall ---------------------------------------------------------
+    {
+      const types = [
+        { name: "Examination", special_type: "none", default_interval_months: 12 },
+        { name: "Hygiene", special_type: "prophy", default_interval_months: 6 },
+        { name: "Child fluoride", special_type: "child_prophy", default_interval_months: 6 },
+        { name: "Perio maintenance", special_type: "perio", default_interval_months: 3 },
+      ];
+      const typeIds: Record<string, string> = {};
+      for (const t of types) {
+        const row = await findOrCreate<Row>("recall_types", { clinic: clinic.id as string, name: t.name },
+          { clinic: clinic.id, ...t });
+        typeIds[t.name] = row.id as string;
+      }
+
+      // The practice's own vocabulary for the chase — deliberately not an
+      // enum in the schema, because no two practices word it the same.
+      const statuses = [
+        { name: "Mailed postcard", abbreviation: "MP", sort: 1 },
+        { name: "Emailed", abbreviation: "EM", sort: 2 },
+        { name: "Texted", abbreviation: "TX", sort: 3 },
+        { name: "Called, no answer", abbreviation: "CNA", sort: 4 },
+      ];
+      const statusIds: Record<string, string> = {};
+      for (const st of statuses) {
+        const row = await findOrCreate<Row>("recall_statuses", { clinic: clinic.id as string, name: st.name },
+          { clinic: clinic.id, ...st });
+        statusIds[st.name] = row.id as string;
+      }
+
+      const addMonths = (iso: string, months: number): string => {
+        const d = new Date(iso + "T00:00:00Z");
+        d.setUTCMonth(d.getUTCMonth() + months);
+        return d.toISOString().slice(0, 10);
+      };
+      const addDays = (iso: string, days: number): string => {
+        const d = new Date(iso + "T00:00:00Z");
+        d.setUTCDate(d.getUTCDate() + days);
+        return d.toISOString().slice(0, 10);
+      };
+
+      // A spread that makes the bookmarks show something: some due soon,
+      // some overdue, one seen early on purpose, one suppressed, and one
+      // where the patient said no to the interval.
+      const plan: Array<{
+        i: number; type: string; interval: number; lastVisitDaysAgo: number;
+        agreed?: string; status?: string; early?: number; disabled?: boolean;
+        until?: number; note?: string;
+      }> = [
+        { i: 0, type: "Examination", interval: 12, lastVisitDaysAgo: 380, status: "Texted",
+          note: "Overdue. Two contact attempts." },
+        { i: 1, type: "Hygiene", interval: 6, lastVisitDaysAgo: 200, status: "Mailed postcard" },
+        { i: 2, type: "Perio maintenance", interval: 3, lastVisitDaysAgo: 100, status: "Called, no answer",
+          note: "Perio maintenance — 3-month interval, not the 6 the patient wanted." },
+        { i: 2, type: "Examination", interval: 12, lastVisitDaysAgo: 100, agreed: "disagreed",
+          note: "Patient asked for annual; clinician advised 3-monthly. Disagreement recorded per NICE." },
+        { i: 3, type: "Child fluoride", interval: 6, lastVisitDaysAgo: 150 },
+        { i: 4, type: "Examination", interval: 24, lastVisitDaysAgo: 700, disabled: true,
+          note: "Moved abroad. Suppressed, not deleted." },
+        { i: 5, type: "Hygiene", interval: 6, lastVisitDaysAgo: 90, early: -21,
+          note: "Brought forward three weeks at the patient's request." },
+        { i: 6, type: "Examination", interval: 12, lastVisitDaysAgo: 30, until: 90,
+          note: "Mid-treatment; recall resumes once the course finishes." },
+      ];
+
+      let made = 0;
+      for (const r of plan) {
+        const patient = patients[r.i];
+        if (!patient) continue;
+        const existing = await must<Row[]>("find recall",
+          api.get(`/items/recalls?limit=1&filter[patient][_eq]=${patient.id}` +
+                  `&filter[recall_type][_eq]=${typeIds[r.type]}`));
+        if (existing.length) continue;
+
+        const previous = at(-r.lastVisitDaysAgo, 10).slice(0, 10);
+        const calculated = addMonths(previous, r.interval);
+        const made_ = await api.post("/items/recalls", {
+          clinic: clinic.id,
+          patient: patient.id,
+          recall_type: typeIds[r.type],
+          interval_months: r.interval,
+          patient_agreed: r.agreed ?? "agreed",
+          interval_set_by: users.dentist,
+          interval_set_on: previous,
+          date_previous: previous,
+          date_due_calculated: calculated,
+          // The authoritative date defaults to the calculated one and is
+          // moved only on purpose — which is the whole reason both exist.
+          date_due: r.early ? addDays(calculated, r.early) : calculated,
+          recall_status: r.status ? statusIds[r.status] : null,
+          is_disabled: r.disabled ?? false,
+          disable_until: r.until ? at(r.until, 10).slice(0, 10) : null,
+          note: r.note ?? null,
+        });
+        if (made_.ok) made++;
+        else log.fail(`recall ${r.type}: ${made_.error.message}`);
+      }
+      log.made(`  ${types.length} recall types, ${statuses.length} statuses, ${made} recalls`);
+    }
+
     // --- dentition: the cases a fixed 32-box chart cannot hold --------
     //
     // Four patients, four shapes of mouth. Every one of these is ordinary
