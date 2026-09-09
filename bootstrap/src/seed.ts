@@ -276,6 +276,125 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     }
     log.made(`  ${charted} tooth findings`);
 
+    // --- payment plan, waiting list, lab work ---------------------------
+    {
+      // A plan with an APR, so the schedule shows interest rather than a
+      // flat division. Computed here because a flow cannot do arithmetic.
+      const payer = patients[7] ?? patients[0]!;
+      const existingPlan = await must<Row[]>("find payment plan",
+        api.get(`/items/payment_plans?limit=1&filter[patient][_eq]=${payer.id}`));
+      let charges = 0;
+      if (!existingPlan.length) {
+        const principal = 1930, down = 300, apr = 6.9, months = 12;
+        const financed = principal - down;
+        const monthlyRate = apr / 100 / 12;
+        // Standard amortisation: the payment that clears the balance in
+        // `months` at `monthlyRate`.
+        const payment = monthlyRate === 0
+          ? financed / months
+          : (financed * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
+        const agreed = at(-20, 10).slice(0, 10);
+        const plan = await must<Row>("create payment plan", api.post("/items/payment_plans", {
+          clinic: clinic.id, patient: payer.id, plan_type: "payment_plan",
+          agreed_on: agreed, total_principal: principal, down_payment: down,
+          first_payment_on: at(10, 10).slice(0, 10),
+          apr, interest_free_payments: null, interest_starts_on: null,
+          number_of_payments: months, payment_amount: Math.round(payment * 100) / 100,
+          charge_frequency: "monthly", handle_treatment_planned: "await_completion",
+          permanent_lock: false,
+          note: "Full mouth rehabilitation, spread over a year. Down payment taken on the day.",
+        }));
+
+        let balance = financed;
+        for (let n = 1; n <= months; n++) {
+          const interest = Math.round(balance * monthlyRate * 100) / 100;
+          // The final instalment absorbs the rounding drift, which is what
+          // a real plan does: twelve payments rounded to the cent leave a
+          // few cents outstanding, and a schedule that does not land
+          // exactly on zero is a schedule that will be argued about.
+          const principalPart = n === months
+            ? balance
+            : Math.round((payment - interest) * 100) / 100;
+          balance = Math.round((balance - principalPart) * 100) / 100;
+          const due = new Date(agreed + "T00:00:00Z");
+          due.setUTCMonth(due.getUTCMonth() + n);
+          const r = await api.post("/items/payment_plan_charges", {
+            clinic: clinic.id, payment_plan: plan.id,
+            due_on: due.toISOString().slice(0, 10),
+            principal: principalPart, interest,
+            balance_after: Math.max(balance, 0),
+            status: n === 1 ? "paid" : "due",
+            sort: n,
+          });
+          if (r.ok) charges++;
+        }
+      }
+
+      // The cancellation list. Deliberately a plain list with a source and
+      // a status — the priority tier is left empty on most of them,
+      // because it is one product's idea and not a standard.
+      const wl: Array<[number, string, string | null, string | null]> = [
+        [3, "unscheduled", null, "Toothache, will take anything this week."],
+        [5, "scheduled_appointment", "high", "In pain. Booked for March, wants sooner."],
+        [9, "recall", null, null],
+        [11, "planned_appointment", "low", "Happy to wait, but asked to be on the list."],
+      ];
+      let waiting = 0;
+      for (const [idx, source, priority, note] of wl) {
+        const patient = patients[idx];
+        if (!patient) continue;
+        const existing = await must<Row[]>("find waiting",
+          api.get(`/items/waiting_list?limit=1&filter[patient][_eq]=${patient.id}`));
+        if (existing.length) continue;
+        const r = await api.post("/items/waiting_list", {
+          clinic: clinic.id, patient: patient.id,
+          added_on: at(-(idx + 2), 10).slice(0, 10),
+          source, priority,
+          wanted_from: at(1, 10).slice(0, 10),
+          wait_target_days: priority ? 14 : null,
+          status: idx === 5 ? "offered" : "waiting",
+          note,
+        });
+        if (r.ok) waiting++;
+      }
+
+      // Lab work, with the timeline that a status enum cannot express: one
+      // case out and overdue, one back and checked, one back and NOT yet
+      // checked — which is the one that matters before the patient sits.
+      const lab = await findOrCreate<Row>("laboratories",
+        { clinic: clinic.id as string, name: "Meridian Dental Laboratory" },
+        {
+          clinic: clinic.id, name: "Meridian Dental Laboratory",
+          phone: "+31 20 555 0199", email: "cases@meridian-lab.example.com",
+          turnaround_days: 10,
+        });
+      const cases: Array<[number, string, number, number | null, number | null, number | null]> = [
+        // patient, instructions, due days, sent, received, checked (days offset)
+        [5, "PFM crown 46. Shade A2. Please return the model.", 4, -9, null, null],
+        [6, "Upper acrylic partial denture, teeth 14 and 16. Shade A1.", -6, -21, -8, -7],
+        [7, "Zirconia crown 26. Shade B1.", 2, -6, -1, null],
+      ];
+      let labCases = 0;
+      for (const [idx, instructions, dueIn, sent, received, checked] of cases) {
+        const patient = patients[idx];
+        if (!patient) continue;
+        const existing = await must<Row[]>("find lab case",
+          api.get(`/items/lab_cases?limit=1&filter[patient][_eq]=${patient.id}` +
+                  `&filter[instructions][_eq]=${encodeURIComponent(instructions)}`));
+        if (existing.length) continue;
+        const r = await api.post("/items/lab_cases", {
+          clinic: clinic.id, patient: patient.id, laboratory: lab.id,
+          instructions,
+          due_at: at(dueIn, 12),
+          sent_at: sent === null ? null : at(sent, 9),
+          received_at: received === null ? null : at(received, 14),
+          checked_at: checked === null ? null : at(checked, 15),
+        });
+        if (r.ok) labCases++;
+      }
+      log.made(`  payment plan (${charges} charges), ${waiting} on the waiting list, ${labCases} lab cases`);
+    }
+
     // --- periodontal: a screen, then the chart it triggered -------------
     {
       const subject = patients[1]!;

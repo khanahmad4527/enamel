@@ -10,6 +10,7 @@ import { recallTypes, recallStatuses, recalls } from "./recalls.js";
 import { treatmentPlans, treatmentPlanItems } from "./plans.js";
 import { clinicalNotes, medicalHistories, patientFindings, consents } from "./records.js";
 import { perioScreenings, perioSextants, perioExams, perioTeeth, perioSites } from "./perio.js";
+import { paymentPlans, paymentPlanCharges, waitingList, laboratories, labCases } from "./practice.js";
 import { documents } from "./documents.js";
 
 import { userFields as rawUserFields, fileFields as rawFileFields } from "./users.js";
@@ -61,8 +62,13 @@ const declared: Collection[] = [
   perioExams,
   perioTeeth,
   perioSites,
+  waitingList,
+  laboratories,
+  labCases,
   invoices,
   invoiceLines,
+  paymentPlans,
+  paymentPlanCharges,
 ];
 
 export const collections: Collection[] = declared.map((c) => ({

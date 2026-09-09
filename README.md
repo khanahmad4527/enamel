@@ -170,6 +170,83 @@ Installed anywhere but here it would render an empty chart. Publishing it
 would mean exposing those as interface options first — worth doing, but a
 separate piece of work, not a `npm publish` away.
 
+## Payment plans, the cancellation list, and lab work
+
+Three named, shipped features that demos leave out — and the interesting
+part is where the real products *disagree with each other*, because that
+disagreement is in the schema rather than averaged away.
+
+### A payment plan is not a repeating charge
+
+A principal, a schedule, an APR, and a down payment that is **subtracted
+before the schedule and the interest are computed** — it is not the first
+instalment. Three plan types, not the four you find in Open Dental,
+because two of those ("Patient Payment Plan" and "Old Payment Plan") are
+the same object under a rename.
+
+Two pairs of fields are mutually exclusive and nothing in a single-field
+validation can say so: interest-free-payment count **or** interest start
+date; number of payments **or** payment amount. Directus validation
+constrains a value, not a pair, so the rule is stated in the field notes
+and **asserted by the suite** instead of being quietly hoped for.
+
+The schedule is computed by whoever writes the plan, because a flow cannot
+do arithmetic. Which surfaced a real bug worth keeping: twelve payments
+rounded to the cent left **five cents outstanding**. The final instalment
+now absorbs the drift, and a check asserts every schedule repays its
+principal exactly and lands on a zero balance — €1,630 financed at 6.9%
+over twelve months, €61.57 of interest, closing at €0.00.
+
+`permanent_lock` is a field rather than a consequence, because whether an
+APR forces a lock depends on a practice-level preference — and the label
+changed from "Full Lock" in v24.3, which is the sort of thing that makes a
+copied screenshot wrong.
+
+### The waiting list, and what is *not* universal
+
+This is the one where averaging the products would have invented a model
+nobody ships. Open Dental's ASAP List is a **binary flag** — patients "who
+would like to be contacted when an earlier appointment becomes available"
+— with no urgency field and no stored declined state. Its only ordering is
+a fixed system heuristic, and a patient declining is an opt-out that
+suppresses notifications rather than a state on the list. Denticon's Quick
+Fill documents neither.
+
+Priority tiers and wait-time targets are **Dentally only**, and even its
+"declined" is documented as a note rather than a structured value. So they
+are here as optional fields under a divider that says *"Optional — not
+universal"*, with the provenance in the note. A check asserts the list
+still works with the priority empty, because that is the shape most
+products actually have.
+
+What all of them agree on is `source` — how the patient reached the list —
+so that is required, and it is what Open Dental orders its outreach by.
+
+### Lab cases: four timestamps, not a status
+
+Another genuine fork. Dentally models lab work as a single enum on the
+appointment (None required / Sent / Received / Overdue, shown as a
+coloured beaker). Open Dental models it as a timestamp state machine. The
+enum is simpler; the timestamps answer *how long was it at the lab* and
+*was the fit checked before the patient sat down*, which the enum cannot.
+
+So: `due_at`, `sent_at`, `received_at`, `checked_at` — and the gaps
+between them are the point. **`sent_at` is when the case was packaged and
+put out**, which "may not actually be picked up until hours later", and
+**`checked_at` is quality checked, a different act from received**. A check
+asserts the seeded data contains all three states: out at the lab, back
+but not yet checked, and checked.
+
+Instructions stay free text. A shade is written the way the technician
+reads it — `PFM crown 46. Shade A1.` — and every attempt to enumerate
+shade systems ends in a dropdown that does not contain the one this lab
+uses.
+
+Two nullable appointment links, not one: the booked visit and a planned
+one. The manual says a case "should always be attached to an appointment"
+and that unattached cases show as unattached — a workflow expectation, not
+a constraint, so the schema does not pretend otherwise.
+
 ## Periodontal screening and charting
 
 Two different acts, so two different shapes. A BPE is a **screen** — six
@@ -541,7 +618,7 @@ both standards rather than leaving a reader to assume.
 
 | | |
 |---|---|
-| **25 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, clinical_notes, medical_histories, patient_findings, consents, perio (screenings, sextants, exams, teeth, sites), treatment_plans (+ items), recalls (+ types, statuses), documents, invoices, invoice_lines |
+| **30 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, clinical_notes, medical_histories, patient_findings, consents, perio (screenings, sextants, exams, teeth, sites), treatment_plans (+ items), recalls (+ types, statuses), payment_plans (+ charges), waiting_list, laboratories, lab_cases, documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
 | **12 global bookmarks** | plans awaiting an answer, recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |

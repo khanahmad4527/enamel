@@ -256,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("25 collections and 2 sidebar folders exist", tables.length === 25 && folders.length === 2,
+  check("30 collections and 2 sidebar folders exist", tables.length === 30 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -331,6 +331,61 @@ async function main() {
     dentitionRows.some((d) => d["absence_reason"] === "congenital") &&
       dentitionRows.some((d) => d["retained"] === true),
     "congenital absence and a retained primary tooth both present");
+
+  /* ---------- payment plans, the waiting list, lab work --------------- */
+  const plans2 = await rows("/items/payment_plans?limit=-1&fields=id,total_principal,down_payment,apr,number_of_payments,payment_amount,interest_free_payments,interest_starts_on");
+  check("a payment plan exists with an APR", plans2.length > 0 && plans2.some((p) => Number(p["apr"]) > 0),
+    `${plans2.length} plan(s)`);
+
+  // "Enter only one" is a cross-field rule Directus validation cannot
+  // express, so it is asserted here instead of being merely documented.
+  const bothInterest = plans2.filter((p) => p["interest_free_payments"] !== null && p["interest_starts_on"] !== null);
+  check("no plan sets both an interest-free count and an interest start date", bothInterest.length === 0,
+    "the pair is exclusive, and nothing enforces it but this");
+
+  // The schedule has to land exactly on zero. Twelve payments rounded to
+  // the cent do not, unless the last one absorbs the drift.
+  let scheduleOk = plans2.length > 0;
+  let detail = "";
+  for (const plan of plans2) {
+    const charges = await rows(
+      `/items/payment_plan_charges?limit=-1&sort=sort&fields=principal,interest,balance_after&filter[payment_plan][_eq]=${plan["id"]}`,
+    );
+    if (!charges.length) { scheduleOk = false; detail = "no charges"; break; }
+    const financed = Number(plan["total_principal"]) - Number(plan["down_payment"]);
+    const repaid = charges.reduce((n, c) => n + Number(c["principal"]), 0);
+    const final = Number(charges[charges.length - 1]!["balance_after"]);
+    if (Math.abs(repaid - financed) > 0.01 || Math.abs(final) > 0.01) {
+      scheduleOk = false;
+      detail = `repaid ${repaid.toFixed(2)} of ${financed.toFixed(2)}, final balance ${final.toFixed(2)}`;
+      break;
+    }
+    detail = `${charges.length} charges repay ${financed.toFixed(2)} exactly, interest ${charges.reduce((n, c) => n + Number(c["interest"]), 0).toFixed(2)}`;
+  }
+  check("the amortisation schedule lands exactly on zero", scheduleOk, detail);
+
+  const wlRows = await rows("/items/waiting_list?limit=-1&fields=source,priority,status");
+  check("the waiting list works without a priority", wlRows.length > 0 && wlRows.some((w) => w["priority"] === null),
+    `${wlRows.filter((w) => w["priority"] === null).length} of ${wlRows.length} entries carry no priority`);
+  const wlSources = new Set(wlRows.map((w) => String(w["source"])));
+  check("entries record how they reached the list", wlSources.size >= 3, [...wlSources].sort().join(", "));
+
+  const labRows = await rows("/items/lab_cases?limit=-1&fields=sent_at,received_at,checked_at");
+  const out = labRows.filter((l) => l["sent_at"] && !l["received_at"]);
+  const backUnchecked = labRows.filter((l) => l["received_at"] && !l["checked_at"]);
+  const done = labRows.filter((l) => l["received_at"] && l["checked_at"]);
+  check("the lab timeline distinguishes back from back-and-checked",
+    out.length > 0 && backUnchecked.length > 0 && done.length > 0,
+    `${out.length} out, ${backUnchecked.length} back but unchecked, ${done.length} checked`);
+
+  const deskLab = await get(desk, "/items/lab_cases?limit=1");
+  check("front desk can see what is at the lab", deskLab.status === 200, `HTTP ${deskLab.status}`);
+  const deskLabWrite = await fetch(`${BASE}/items/lab_cases`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${desk}`, "content-type": "application/json" },
+    body: JSON.stringify({ clinic: riverside, patient: somePatient, instructions: "probe" }),
+  });
+  check("front desk CANNOT raise a lab case", deskLabWrite.status === 403, `HTTP ${deskLabWrite.status}`);
 
   /* ---------- periodontal ---------------------------------------------- */
   const sextantRows = await rows("/items/perio_sextants?limit=-1&fields=sextant,bpe_code,furcation,teeth_scored");

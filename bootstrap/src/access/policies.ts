@@ -187,6 +187,13 @@ const receptionist: Policy = {
     // procedures on it; proposing treatment is a clinical act.
     ...readOnly("treatment_plans"),
     ...readOnly("treatment_plan_items"),
+    // Reception owns the diary, so filling a cancellation is theirs; and
+    // they take the money, so the payment plans are too.
+    ...crud("waiting_list", ["create", "read", "update", "delete"]),
+    ...crud("payment_plans", ["create", "read", "update"]),
+    ...crud("payment_plan_charges", ["create", "read", "update"]),
+    ...readOnly("lab_cases"),
+    ...readOnly("laboratories"),
     // Reception sees THAT a patient has an active allergy — they book and
     // greet, and a penicillin allergy on the day list is safety, not
     // clinical detail. They do not get the note, the severity or anything
@@ -224,6 +231,9 @@ const hygienist: Policy = {
     ...crud("perio_exams", ["create", "read"]),
     ...crud("perio_teeth", ["create", "read"]),
     ...crud("perio_sites", ["create", "read"]),
+    ...crud("waiting_list", ["create", "read", "update"]),
+    ...crud("lab_cases", ["create", "read", "update"]),
+    ...readOnly("laboratories"),
     ...crud("consents", ["create", "read"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
@@ -264,6 +274,12 @@ const dentist: Policy = {
     ...crud("perio_exams", ["create", "read", "update", "delete"]),
     ...crud("perio_teeth", ["create", "read", "update", "delete"]),
     ...crud("perio_sites", ["create", "read", "update", "delete"]),
+    ...crud("waiting_list", ["create", "read", "update", "delete"]),
+    ...crud("lab_cases", ["create", "read", "update", "delete"]),
+    ...readOnly("laboratories"),
+    ...crud("payment_plans", ["create", "read", "update", "delete"]),
+    ...crud("payment_plan_charges", ["create", "read", "update", "delete"]),
+    ...crud("laboratories", ["create", "read", "update", "delete"]),
     ...crud("consents", ["create", "read"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
@@ -308,6 +324,12 @@ const practiceOwner: Policy = {
     ...crud("perio_exams", ["create", "read", "update", "delete"]),
     ...crud("perio_teeth", ["create", "read", "update", "delete"]),
     ...crud("perio_sites", ["create", "read", "update", "delete"]),
+    ...crud("waiting_list", ["create", "read", "update", "delete"]),
+    ...crud("lab_cases", ["create", "read", "update", "delete"]),
+    ...readOnly("laboratories"),
+    ...crud("payment_plans", ["create", "read", "update", "delete"]),
+    ...crud("payment_plan_charges", ["create", "read", "update", "delete"]),
+    ...crud("laboratories", ["create", "read", "update", "delete"]),
     ...crud("consents", ["create", "read"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
@@ -361,6 +383,18 @@ const patientPortal: Policy = {
       action: "read",
       permissions: ownPatientChild,
       fields: ["id", "tooth", "surface", "condition", "recorded_at"],
+    },
+    {
+      collection: "payment_plans",
+      action: "read",
+      permissions: ownPatientChild,
+      fields: ["id", "plan_type", "agreed_on", "total_principal", "payment_amount", "charge_frequency"],
+    },
+    {
+      collection: "payment_plan_charges",
+      action: "read",
+      permissions: { payment_plan: { patient: { portal_user: { _eq: "$CURRENT_USER" } } } },
+      fields: ["id", "due_on", "principal", "interest", "balance_after", "status"],
     },
     {
       collection: "perio_screenings",
