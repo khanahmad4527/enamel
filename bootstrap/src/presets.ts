@@ -23,6 +23,34 @@ const w = (widths: Record<string, number>) => ({ tabular: { widths } });
 export const presets: Preset[] = [
   {
     /**
+     * The follow-up list that pays for itself. A plan presented and not
+     * yet answered is money sitting still, and "not yet answered" is a
+     * filter — presented, no acceptance date — rather than a status
+     * somebody has to remember to set.
+     */
+    bookmark: "$t:enamel_bm_plans_presented",
+    collection: "treatment_plans",
+    role: null,
+    icon: "pending_actions",
+    color: "#B4762A",
+    layout: "tabular",
+    layout_query: {
+      tabular: {
+        sort: ["presented_on"],
+        fields: ["patient", "title", "presented_on", "presented_total", "accepted_total"],
+      },
+    },
+    layout_options: w({ patient: 190, title: 240, presented_on: 140, presented_total: 140, accepted_total: 140 }),
+    filter: {
+      _and: [
+        { status: { _eq: "active" } },
+        { presented_on: { _nnull: true } },
+        { accepted_on: { _null: true } },
+      ],
+    },
+  },
+  {
+    /**
      * The worklist a practice actually runs on. "Overdue" is a filter, not
      * a stored state — date_due against $NOW, resolved per request — and
      * the suppression fields are honoured here rather than in application

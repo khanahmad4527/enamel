@@ -276,6 +276,138 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     }
     log.made(`  ${charted} tooth findings`);
 
+    // --- treatment plans ------------------------------------------------
+    //
+    // Four plans that make the acceptance arithmetic visible: one accepted
+    // in full, one where the patient took the cheap half and declined the
+    // crown, one still awaiting an answer, and a superseded alternative
+    // left inactive rather than deleted.
+    {
+      const plans: Array<{
+        i: number; title: string; status: string; presentedDaysAgo: number | null;
+        acceptedDaysAgo?: number; signed?: boolean;
+        items: Array<{ t: number; tooth: string | null; priority: string; fee: number; status: string }>;
+        note?: string;
+      }> = [
+        {
+          i: 5, title: "Upper right quadrant, phase 1", status: "active",
+          presentedDaysAgo: 40, acceptedDaysAgo: 38, signed: true,
+          items: [
+            { t: 3, tooth: "16", priority: "1", fee: 210, status: "accepted" },
+            { t: 4, tooth: "16", priority: "1", fee: 520, status: "accepted" },
+            { t: 1, tooth: null, priority: "2", fee: 75, status: "accepted" },
+          ],
+          note: "Accepted in full and signed on the tablet in surgery.",
+        },
+        {
+          i: 6, title: "Lower left restorations", status: "active",
+          presentedDaysAgo: 25, acceptedDaysAgo: 25,
+          items: [
+            { t: 3, tooth: "36", priority: "1", fee: 210, status: "accepted" },
+            { t: 3, tooth: "37", priority: "1", fee: 210, status: "accepted" },
+            // The expensive one is the one that gets declined, which is
+            // exactly why a value-based acceptance rate reads lower than a
+            // count-based one.
+            { t: 4, tooth: "36", priority: "2", fee: 520, status: "declined" },
+          ],
+          note: "Fillings accepted, crown declined on cost. Reviewing in six months.",
+        },
+        {
+          i: 7, title: "Full mouth rehabilitation", status: "active",
+          presentedDaysAgo: 6,
+          items: [
+            { t: 4, tooth: "11", priority: "1", fee: 520, status: "proposed" },
+            { t: 4, tooth: "21", priority: "1", fee: 520, status: "proposed" },
+            { t: 5, tooth: "46", priority: "2", fee: 890, status: "proposed" },
+          ],
+          note: "Presented; patient is considering it and has asked about payment options.",
+        },
+        // patients[0] is also the portal patient, so these two are what
+        // the portal checks read: an active plan they may see, and an
+        // inactive alternative they must not. Without them the portal
+        // assertion passes because there is nothing to show, which is not
+        // the same as passing.
+        {
+          i: 0, title: "Two fillings and a scale", status: "active",
+          presentedDaysAgo: 12, acceptedDaysAgo: 11,
+          items: [
+            { t: 3, tooth: "24", priority: "1", fee: 210, status: "accepted" },
+            { t: 3, tooth: "25", priority: "1", fee: 210, status: "accepted" },
+            { t: 1, tooth: null, priority: "2", fee: 75, status: "proposed" },
+          ],
+          note: "Accepted the fillings; hygiene visit still to book.",
+        },
+        {
+          i: 0, title: "Whitening and veneers", status: "inactive",
+          presentedDaysAgo: 60,
+          items: [
+            { t: 4, tooth: "11", priority: "1", fee: 520, status: "declined" },
+            { t: 4, tooth: "21", priority: "1", fee: 520, status: "declined" },
+          ],
+          note: "Cosmetic option the patient declined. Kept, not deleted.",
+        },
+        {
+          i: 6, title: "Lower left — crown alternative", status: "inactive",
+          presentedDaysAgo: 25,
+          items: [
+            { t: 4, tooth: "36", priority: "1", fee: 520, status: "declined" },
+            { t: 5, tooth: "36", priority: "1", fee: 890, status: "declined" },
+          ],
+          note: "The costlier option, kept because the patient may come back to it.",
+        },
+      ];
+
+      let plansMade = 0, itemsMade = 0;
+      for (const p of plans) {
+        const patient = patients[p.i];
+        if (!patient) continue;
+        const existing = await must<Row[]>("find plan",
+          api.get(`/items/treatment_plans?limit=1&filter[patient][_eq]=${patient.id}` +
+                  `&filter[title][_eq]=${encodeURIComponent(p.title)}`));
+        if (existing.length) continue;
+
+        // Frozen totals: the sum of what was quoted, and the sum of what
+        // was accepted. Computed here rather than by a flow because a flow
+        // cannot add two numbers together.
+        const presented = p.items.reduce((n, it) => n + it.fee, 0);
+        const accepted = p.items
+          .filter((it) => it.status === "accepted" || it.status === "completed")
+          .reduce((n, it) => n + it.fee, 0);
+
+        const plan = await must<Row>("create plan", api.post("/items/treatment_plans", {
+          clinic: clinic.id,
+          patient: patient.id,
+          title: p.title,
+          status: p.status,
+          presented_on: p.presentedDaysAgo === null ? null : at(-p.presentedDaysAgo, 10).slice(0, 10),
+          presented_total: presented,
+          accepted_on: p.acceptedDaysAgo ? at(-p.acceptedDaysAgo, 10).slice(0, 10) : null,
+          accepted_total: accepted,
+          signed_on: p.signed ? at(-(p.acceptedDaysAgo ?? 1), 11) : null,
+          signed_by: p.signed ? "Signed in surgery on the tablet" : null,
+          note: p.note ?? null,
+        }));
+        plansMade++;
+
+        for (const [si, it] of p.items.entries()) {
+          const treatment = treatments[it.t % treatments.length];
+          const r = await api.post("/items/treatment_plan_items", {
+            clinic: clinic.id,
+            plan: plan.id,
+            treatment: treatment?.id,
+            tooth: it.tooth,
+            priority: it.priority,
+            fee_presented: it.fee,
+            status: it.status,
+            sort: si + 1,
+          });
+          if (r.ok) itemsMade++;
+          else log.fail(`plan item ${it.tooth ?? "-"}: ${r.error.message}`);
+        }
+      }
+      log.made(`  ${plansMade} treatment plans, ${itemsMade} items`);
+    }
+
     // --- recall ---------------------------------------------------------
     {
       const types = [

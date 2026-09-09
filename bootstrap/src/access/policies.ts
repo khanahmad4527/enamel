@@ -183,6 +183,10 @@ const receptionist: Policy = {
     ...crud("recalls", ["create", "read", "update"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
+    // Read-only on purpose. Reception quotes from a plan and books the
+    // procedures on it; proposing treatment is a clinical act.
+    ...readOnly("treatment_plans"),
+    ...readOnly("treatment_plan_items"),
     // No treatment_records. No tooth_conditions. No radiographs. Deliberate.
   ],
 };
@@ -202,6 +206,8 @@ const hygienist: Policy = {
     ...crud("tooth_conditions", ["create", "read", "update"]),
     ...crud("dentition", ["create", "read", "update"]),
     ...crud("recalls", ["create", "read", "update"]),
+    ...crud("treatment_plans", ["create", "read", "update"]),
+    ...crud("treatment_plan_items", ["create", "read", "update"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
@@ -227,6 +233,8 @@ const dentist: Policy = {
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
     ...crud("dentition", ["create", "read", "update", "delete"]),
     ...crud("recalls", ["create", "read", "update", "delete"]),
+    ...crud("treatment_plans", ["create", "read", "update", "delete"]),
+    ...crud("treatment_plan_items", ["create", "read", "update", "delete"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
@@ -256,6 +264,8 @@ const practiceOwner: Policy = {
     ...crud("tooth_conditions", ["create", "read", "update", "delete"]),
     ...crud("dentition", ["create", "read", "update", "delete"]),
     ...crud("recalls", ["create", "read", "update", "delete"]),
+    ...crud("treatment_plans", ["create", "read", "update", "delete"]),
+    ...crud("treatment_plan_items", ["create", "read", "update", "delete"]),
     ...readOnly("recall_types"),
     ...readOnly("recall_statuses"),
     // Directus unions permissions across the policies on a role, so this
@@ -308,6 +318,18 @@ const patientPortal: Policy = {
       action: "read",
       permissions: ownPatientChild,
       fields: ["id", "tooth", "surface", "condition", "recorded_at"],
+    },
+    {
+      collection: "treatment_plans",
+      action: "read",
+      permissions: { _and: [ownPatientChild, { status: { _neq: "inactive" } }] },
+      fields: ["id", "title", "status", "presented_on", "presented_total", "accepted_on", "accepted_total", "signed_on"],
+    },
+    {
+      collection: "treatment_plan_items",
+      action: "read",
+      permissions: { plan: { patient: { portal_user: { _eq: "$CURRENT_USER" } } } },
+      fields: ["id", "plan", "treatment", "tooth", "priority", "fee_presented", "status"],
     },
     {
       collection: "recalls",

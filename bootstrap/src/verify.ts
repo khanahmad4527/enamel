@@ -256,7 +256,7 @@ async function main() {
   );
   const tables = collections.filter((c) => c["schema"]);
   const folders = collections.filter((c) => !c["schema"]);
-  check("14 collections and 2 sidebar folders exist", tables.length === 14 && folders.length === 2,
+  check("16 collections and 2 sidebar folders exist", tables.length === 16 && folders.length === 2,
     `${tables.length} tables, ${folders.length} folders`);
 
   /* ---------- validation actually rejects ----------------------------- */
@@ -331,6 +331,54 @@ async function main() {
     dentitionRows.some((d) => d["absence_reason"] === "congenital") &&
       dentitionRows.some((d) => d["retained"] === true),
     "congenital absence and a retained primary tooth both present");
+
+  /* ---------- treatment plans and case acceptance --------------------- */
+  const planRows = await rows(
+    "/items/treatment_plans?limit=-1&fields=id,patient,status,presented_total,accepted_total,signed_on",
+  );
+  const activePerPatient = new Map<string, number>();
+  for (const p of planRows) {
+    if (p["status"] !== "active") continue;
+    const k = String(p["patient"]);
+    activePerPatient.set(k, (activePerPatient.get(k) ?? 0) + 1);
+  }
+  const overActive = [...activePerPatient.values()].filter((n) => n > 1);
+  check("exactly one active plan per patient", overActive.length === 0,
+    overActive.length ? `${overActive.length} patient(s) with more than one` : `${activePerPatient.size} patients`);
+
+  check("an inactive plan is kept rather than deleted",
+    planRows.some((p) => p["status"] === "inactive"),
+    "a superseded alternative survives");
+
+  check("a signed plan records its signature",
+    planRows.some((p) => Boolean(p["signed_on"])), "one plan is signed");
+
+  // The whole reason both totals are stored: the two acceptance rates
+  // disagree, and the gap is the diagnostic signal.
+  const planItems = await rows("/items/treatment_plan_items?limit=-1&fields=status,fee_presented");
+  const presentedValue = planRows.reduce((n, p) => n + Number(p["presented_total"] ?? 0), 0);
+  const acceptedValue = planRows.reduce((n, p) => n + Number(p["accepted_total"] ?? 0), 0);
+  const acceptedCount = planItems.filter((i) => i["status"] === "accepted" || i["status"] === "completed").length;
+  const byValue = presentedValue ? (acceptedValue / presentedValue) * 100 : 0;
+  const byCount = planItems.length ? (acceptedCount / planItems.length) * 100 : 0;
+  check("both acceptance rates are derivable, and they disagree",
+    presentedValue > 0 && planItems.length > 0 && Math.abs(byValue - byCount) > 1,
+    `${byValue.toFixed(1)}% by value vs ${byCount.toFixed(1)}% by count`);
+
+  const deskPlans = await get(desk, "/items/treatment_plans?limit=1");
+  check("front desk can read a plan to quote from it", deskPlans.status === 200, `HTTP ${deskPlans.status}`);
+  const deskPlanWrite = await fetch(`${BASE}/items/treatment_plans`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${desk}`, "content-type": "application/json" },
+    body: JSON.stringify({ clinic: riverside, patient: somePatient, title: "desk probe" }),
+  });
+  check("front desk CANNOT propose treatment", deskPlanWrite.status === 403, `HTTP ${deskPlanWrite.status}`);
+
+  const portalPlans = await get(portal, "/items/treatment_plans?limit=-1&fields=id,title,status,presented_total");
+  const portalStatuses = new Set(((portalPlans.data ?? []) as Array<{ status: string }>).map((p) => p.status));
+  check("a patient sees their own plan and what it costs", portalPlans.status === 200);
+  check("a patient is NOT shown superseded alternatives", !portalStatuses.has("inactive"),
+    [...portalStatuses].join(", ") || "none");
 
   /* ---------- recall, and what NICE requires of it -------------------- */
   const someType = ((await rows("/items/recall_types?limit=1&fields=id"))[0] ?? {})["id"];
@@ -416,7 +464,7 @@ async function main() {
   const presets = (await rows("/presets?limit=-1&fields=id,bookmark,collection,user"))
     .filter((p) => p["user"] === null && p["bookmark"]);
   const unresolved = presets.filter((p) => !String(p["bookmark"]).startsWith("$t:"));
-  check("eleven global bookmarks, all translated", presets.length === 11 && unresolved.length === 0,
+  check("twelve global bookmarks, all translated", presets.length === 12 && unresolved.length === 0,
     `${presets.length} bookmarks`);
 
   /* ---------- flows ---------------------------------------------------- */

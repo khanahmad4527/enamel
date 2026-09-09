@@ -170,6 +170,64 @@ Installed anywhere but here it would render an empty chart. Publishing it
 would mean exposing those as interface options first — worth doing, but a
 separate piece of work, not a `npm publish` away.
 
+## Treatment planning, and why one number is a lie
+
+A treatment plan is not a filter over procedures with a "planned" status —
+that is the thing it gets mistaken for. It is a record with a three-value
+status and real transitions: promoting an inactive plan demotes the active
+one.
+
+| | |
+|---|---|
+| `active` | Exactly one per patient. Supplies the defaults for the chart and for booking |
+| `inactive` | As many as you like — alternatives, superseded versions, the cheaper option the patient is mulling |
+| `saved` | A permanent snapshot. **Signing one freezes it**: its procedures cannot be edited until the signature is cleared |
+
+"Exactly one active per patient" is a partial unique index — `UNIQUE
+(patient) WHERE status = 'active'` — which Directus cannot create through
+its API. It is enforced by whoever promotes a plan and **asserted by the
+verify suite**, which is the honest position: stated, tested, and not
+pretended to be a database constraint.
+
+### The presented total is frozen, and that is the point
+
+Case acceptance by value is `accepted ÷ presented`. If "presented" is
+recomputed from today's fee schedule, every price rise silently rewrites
+last year's acceptance rate. So the amount the patient was actually shown
+is stored, at plan level and per item, and never recalculated.
+
+**No percentage is stored anywhere**, which is the part worth arguing
+about. Both a value-based and a count-based rate matter, and the *gap
+between them* is the diagnostic signal: a count rate much higher than the
+value rate means the expensive cases are the ones being declined. A single
+blended figure throws that away. The seed makes it visible —
+
+```console
+Riverside case acceptance —
+  by value: 24.1%  (€1225.00 of €5085.00)
+  by count: 45.5%  (5 of 11 procedures)
+```
+
+— and a check asserts the two disagree, so the day someone "simplifies"
+this into one column, the suite says so.
+
+For calibration, since the numbers get quoted loosely: observed averages
+run ~50–60% count-based and ~35–45% value-based, and the widely repeated
+"75–80%" high-performer target has no primary ADA source behind it. That
+asymmetry is normal, not a problem to be fixed.
+
+Priority is free text capped at seven characters, not an enum, because
+Open Dental's priorities are a user-editable list accepting "numbers,
+letters or words up to 7 characters" — a practice may run 1/2/3, or A/B/C,
+or URGENT.
+
+Reception reads plans and cannot write them: quoting from a plan and
+booking its procedures is their job, proposing treatment is not. A patient
+sees their own active plan and what it costs, and is not shown the
+superseded alternatives — checked with a patient who has both, because a
+portal assertion against a patient with no plans passes without proving
+anything.
+
 ## Recall, and the field everyone forgets
 
 The module a dentist looks for first and hobby schemas leave out, because
@@ -331,9 +389,9 @@ both standards rather than leaving a reader to assume.
 
 | | |
 |---|---|
-| **14 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, recalls (+ types, statuses), documents, invoices, invoice_lines |
+| **16 collections** | clinics, rooms, patients, appointments, treatments, treatment_records, tooth_conditions, dentition, treatment_plans (+ items), recalls (+ types, statuses), documents, invoices, invoice_lines |
 | **6 policies / 5 roles** | practice owner, dentist, hygienist, front desk, patient portal |
-| **11 global bookmarks** | recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
+| **12 global bookmarks** | plans awaiting an answer, recalls overdue, recalls due, today's diary, my schedule, needs a reminder, no-shows, unpaid invoices, new patients, treatment plans, work completed today, medical alerts (dentists) |
 | **7 flows** | appointment reminders (hourly, fanned out one flow per patient), invoice totals on line add and on line change, overdue invoices (nightly), and two that classify document files |
 | **1 custom interface** | the FDI tooth chart, with ISO 10394 supernumerary teeth listed beside it |
 | **Full branding** | logo, favicon, login screen and admin theme, applied as code |
