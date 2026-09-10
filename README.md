@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="BSL 1.1" src="https://img.shields.io/badge/licence-BSL_1.1-0D6E63">
   <img alt="Directus 12.3.1" src="https://img.shields.io/badge/Directus-12.3.1-0D6E63">
-  <img alt="access checks" src="https://img.shields.io/badge/checks-105%2F105-2ECDA7">
+  <img alt="access checks" src="https://img.shields.io/badge/checks-108%2F108-2ECDA7">
 </p>
 
 ---
@@ -114,16 +114,16 @@ $ pnpm verify
   PASS  no invoice header disagrees with its own lines               16 invoices, 16 lines
   ... 93 more
 
-  105/105 checks passed
+  108/108 checks passed
 ```
 
-Twelve of the hundred and five are shown; the run prints every one.
+Twelve of the hundred and eight are shown; the run prints every one.
 
 The tenancy checks matter most. The seed creates **two** practices on purpose —
 with only one, a broken tenant filter is invisible, because everything you can
 see happens to be yours.
 
-Thirty-six of the hundred and five are access and tenancy. Fifty-one are
+Thirty-six of the hundred and eight are access and tenancy. Fifty-one are
 clinical: that a BPE code of 4 with an asterisk is stored as two independent
 axes, that a recall interval outside what NICE CG19 allows for the patient's
 age is refused, that all 86 ISO 3950 and ISO 10394 designations are accepted
@@ -131,7 +131,7 @@ and a 86th-plus-one is not, that a clinical record cannot be edited after it
 is filed. Two are the money: no invoice header may disagree with the lines it
 claims to total, and no total may disagree with the tax rate on its own row.
 
-The remaining sixteen cover provisioning, because provisioning logs its
+The remaining nineteen cover provisioning, because provisioning logs its
 per-item failures instead of throwing: a run can finish with the branding
 half-applied, no bookmarks and a flow missing. They assert that the brand kit
 is in its folder, that four languages are present and the same length, that
@@ -139,7 +139,10 @@ every `$t:` key the instance references resolves in all four of them, that
 twelve bookmarks exist and all resolve through `$t:`, that seven flows are
 active, that no list renders a raw uuid or a bare enum value where a label was
 configured, that the two nullable relations the field notes describe are
-populated on at least one row rather than null everywhere, and that the
+populated on at least one row rather than null everywhere, that every
+collection opens on a list somebody designed rather than on whichever
+columns Directus found first, that no English field label falls back to a
+title-cased column name that mangles a unit, and that the
 tooth-chart interface both loaded *and* is the interface the patient form uses
 — plus that posting an impossible FDI number is refused, which is the
 validation claim rather than a description of it.
@@ -863,7 +866,7 @@ Two ways past it:
 Both are tested from an empty database: the access-model half passed
 21/21 on a clean 12.3.1 with an OIG key, and 21/21 on 11.17.4 with no key
 at all. Those are the figures the clean-database runs measured, and they
-are left as measured. The suite has since grown to 105 — the additions
+are left as measured. The suite has since grown to 108 — the additions
 cover clinical rules, the invoice arithmetic and provisioning, and have
 only been run against an existing instance.
 

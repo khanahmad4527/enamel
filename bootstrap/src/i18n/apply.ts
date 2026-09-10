@@ -1,11 +1,24 @@
 import { api, must } from "../client.js";
 import { log } from "../log.js";
 import { collections, groups } from "../schema/index.js";
-import { COLLECTIONS, FIELDS, STRINGS, LANGUAGES, type Lang, type T3 } from "./dictionary.js";
+import { COLLECTIONS, FIELDS, FIELD_EN, STRINGS, LANGUAGES, type Lang, type T3 } from "./dictionary.js";
 
 /** Turns a [de, nl, fr] tuple into the per-language rows Directus wants. */
 function rows<T>(t: T3, make: (lang: Lang, value: string) => T): T[] {
   return LANGUAGES.map((lang, i) => make(lang, t[i] as string));
+}
+
+/**
+ * The translations array for one field label.
+ *
+ * An `en-US` row is added only where `FIELD_EN` overrides Directus's
+ * title-cased guess, so the common case stays as it was rather than
+ * gaining 263 entries that repeat the column name back.
+ */
+function fieldTranslations(field: string, t: T3) {
+  const all = rows(t, (language, translation) => ({ language, translation }));
+  const en = FIELD_EN[field];
+  return en ? [{ language: "en-US", translation: en }, ...all] : all;
 }
 
 /**
@@ -78,7 +91,7 @@ async function applyFieldNames(): Promise<void> {
       if (f.field === "id" || f.field.startsWith("divider_")) continue;
       const t = FIELDS[f.field];
       if (!t) { skipped++; continue; }
-      const translations = rows(t, (language, translation) => ({ language, translation }));
+      const translations = fieldTranslations(f.field, t);
       const r = await api.patch(`/fields/${c.collection}/${f.field}`, { meta: { translations } });
       if (r.ok) done++;
       else log.fail(`field ${c.collection}.${f.field}: ${r.error.message}`);
@@ -89,7 +102,7 @@ async function applyFieldNames(): Promise<void> {
   {
     const t = FIELDS["lines"];
     if (t) {
-      const translations = rows(t, (language, translation) => ({ language, translation }));
+      const translations = fieldTranslations("lines", t);
       const r = await api.patch("/fields/invoices/lines", { meta: { translations } });
       if (r.ok) done++;
     }
@@ -99,7 +112,7 @@ async function applyFieldNames(): Promise<void> {
   for (const field of ["clinic", "job_title"]) {
     const t = FIELDS[field];
     if (!t) continue;
-    const translations = rows(t, (language, translation) => ({ language, translation }));
+    const translations = fieldTranslations(field, t);
     const r = await api.patch(`/fields/directus_users/${field}`, { meta: { translations } });
     if (r.ok) done++;
   }

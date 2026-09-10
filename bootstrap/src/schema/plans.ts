@@ -206,7 +206,7 @@ export const treatmentPlanItems: Collection = {
       type: "uuid",
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], required: true,
-        options: { template: "{{title}}" },
+        options: { template: "{{patient.last_name}} — {{title}}" },
         width: "half",
       },
       schema: { is_nullable: false },

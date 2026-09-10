@@ -217,8 +217,11 @@ const RELATED_TEMPLATES: Record<string, string> = {
   user_updated: "{{first_name}} {{last_name}}",
   room: "{{name}}",
   treatment: "{{code}} — {{name}}",
-  appointment: "{{starts_at}}",
-  treatment_record: "{{performed_at}}",
+  // A date alone is not an identity. Four rows reading "July 26th, 2026"
+  // in a 240-row list of perio sites are four different exams on two
+  // patients in two practices, and nothing on the screen said so.
+  appointment: "{{patient.last_name}} — {{starts_at}}",
+  treatment_record: "{{patient.last_name}} — {{performed_at}}",
   invoice: "{{number}}",
 };
 

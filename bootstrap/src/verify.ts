@@ -642,6 +642,54 @@ async function main() {
     const meta = (f["meta"] ?? {}) as { translations?: unknown[] };
     return Array.isArray(meta.translations) && meta.translations.length >= 3;
   });
+  // English is the fallback language, and it had no labels at all: the
+  // dictionary carries de/nl/fr, so English rendered the column name
+  // title-cased. Correct for first_name, wrong for anything with a unit
+  // or an abbreviation in it — `apr` read as "Apr", which in a table of
+  // dates is a month.
+  {
+    const mangled: string[] = [];
+    for (const c of (await rows("/collections?limit=-1"))
+      .filter((x) => !String(x["collection"]).startsWith("directus_") && x["schema"])
+      .map((x) => String(x["collection"]))) {
+      for (const f of await rows(`/fields/${c}`)) {
+        const field = String(f["field"]);
+        const meta = (f["meta"] ?? {}) as { translations?: Array<{ language: string }> };
+        const hasEn = (meta.translations ?? []).some((t) => t.language === "en-US");
+        if (hasEn) continue;
+        const fallback = field.split("_").map((w) => w[0]?.toUpperCase() + w.slice(1)).join(" ");
+        if (/\b(Mm|Bpe|Fdi|Apr|Iso|Url|Pdf|Cal)\b/.test(fallback) ||
+            /\b(Mm|Months|Days|Minutes|Hours)$/.test(fallback)) {
+          mangled.push(`${c}.${field} → "${fallback}"`);
+        }
+      }
+    }
+    check("no English field label falls back to a mangled column name",
+      mangled.length === 0,
+      mangled.length ? mangled.slice(0, 6).join(", ") : "checked every field");
+  }
+
+  // A relation display naming only a date identifies nothing: four rows
+  // reading "July 26th, 2026" in a list of 240 perio sites were four
+  // different exams, on two patients, in two practices.
+  {
+    const dateOnly = new Set(["{{examined_on}}", "{{starts_at}}", "{{performed_at}}",
+                              "{{title}}", "{{due_at}}", "{{sent_at}}", "{{taken_on}}"]);
+    const vague: string[] = [];
+    for (const c of (await rows("/collections?limit=-1"))
+      .filter((x) => !String(x["collection"]).startsWith("directus_") && x["schema"])
+      .map((x) => String(x["collection"]))) {
+      for (const f of await rows(`/fields/${c}`)) {
+        const meta = (f["meta"] ?? {}) as { display?: string; display_options?: { template?: string } };
+        if (meta.display !== "related-values") continue;
+        const tpl = meta.display_options?.template ?? "";
+        if (dateOnly.has(tpl)) vague.push(`${c}.${String(f["field"])} = ${tpl}`);
+      }
+    }
+    check("no relation is displayed as a bare date or title",
+      vague.length === 0, vague.length ? vague.join(", ") : "checked every m2o");
+  }
+
   check("field labels carry their own translations", translated.length >= 15,
     `${translated.length} of ${patientFields.length} patient fields`);
 
@@ -766,6 +814,24 @@ async function main() {
   const unresolved = presets.filter((p) => !String(p["bookmark"]).startsWith("$t:"));
   check("twelve global bookmarks, all translated", presets.length === 12 && unresolved.length === 0,
     `${presets.length} bookmarks`);
+
+  // A collection with no default preset opens on whichever columns
+  // Directus finds first, which is not a view anybody designed. Perio
+  // Sites opened on Clinic, Exam, Site, Tooth: 240 rows of periodontal
+  // readings and not one reading among the columns.
+  {
+    const all = await rows("/presets?limit=-1&fields=collection,bookmark,user,role");
+    const defaults = new Set(all
+      .filter((p) => !p["bookmark"] && !p["user"] && !p["role"])
+      .map((p) => String(p["collection"])));
+    const tables = (await rows("/collections?limit=-1"))
+      .filter((c) => !String(c["collection"]).startsWith("directus_") && c["schema"])
+      .map((c) => String(c["collection"]));
+    const missing = tables.filter((t) => !defaults.has(t));
+    check("every collection opens on a view somebody designed",
+      tables.length > 0 && missing.length === 0,
+      missing.length ? missing.join(", ") : `${tables.length} collections`);
+  }
 
   /* ---------- the money adds up ---------------------------------------- */
   // Invoice headers are written by a flow, not by hand, so nothing in the

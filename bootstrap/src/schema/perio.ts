@@ -147,7 +147,7 @@ export const perioSextants: Collection = {
       type: "uuid",
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], required: true,
-        options: { template: "{{examined_on}}" }, width: "half",
+        options: { template: "{{patient.last_name}} — {{examined_on}}" }, width: "half",
       },
       schema: { is_nullable: false },
     },
@@ -419,7 +419,7 @@ export const perioTeeth: Collection = {
       type: "uuid",
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], required: true,
-        options: { template: "{{examined_on}}" }, width: "half",
+        options: { template: "{{patient.last_name}} — {{examined_on}}" }, width: "half",
       },
       schema: { is_nullable: false },
     },
@@ -556,7 +556,7 @@ export const perioSites: Collection = {
       type: "uuid",
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], required: true,
-        options: { template: "{{examined_on}}" }, width: "half",
+        options: { template: "{{patient.last_name}} — {{examined_on}}" }, width: "half",
       },
       schema: { is_nullable: false },
     },

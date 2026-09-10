@@ -289,7 +289,7 @@ export const medicalHistories: Collection = {
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], readonly: true, width: "half",
         note: "$t:enamel_note_superseded_by",
-        options: { template: "{{taken_on}}" },
+        options: { template: "{{patient.last_name}} — {{taken_on}}" },
       },
       schema: {},
     },
@@ -498,7 +498,7 @@ export const consents: Collection = {
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], width: "half",
         note: "$t:enamel_note_consent_plan",
-        options: { template: "{{title}}" },
+        options: { template: "{{patient.last_name}} — {{title}}" },
       },
       schema: {},
     },

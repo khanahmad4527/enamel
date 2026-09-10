@@ -388,7 +388,7 @@ export const waitingList: Collection = {
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], width: "half",
         note: "$t:enamel_note_wl_appointment",
-        options: { template: "{{starts_at}}" },
+        options: { template: "{{patient.last_name}} — {{starts_at}}" },
       },
       schema: {},
     },
@@ -571,7 +571,7 @@ export const labCases: Collection = {
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], width: "half",
         note: "$t:enamel_note_lab_appointment",
-        options: { template: "{{starts_at}}" },
+        options: { template: "{{patient.last_name}} — {{starts_at}}" },
       },
       schema: {},
     },
@@ -581,7 +581,7 @@ export const labCases: Collection = {
       meta: {
         interface: "select-dropdown-m2o", special: ["m2o"], width: "half",
         note: "$t:enamel_note_lab_plan",
-        options: { template: "{{title}}" },
+        options: { template: "{{patient.last_name}} — {{title}}" },
       },
       schema: {},
     },

@@ -91,6 +91,33 @@ export const COLLECTIONS: Record<string, { singular: T3; plural: T3 }> = {
                        plural:   ["Abrechnung", "Facturatie", "Facturation"] },
 };
 
+/**
+ * English field labels, where Directus's own guess is wrong.
+ *
+ * `FIELDS` below carries de/nl/fr only, so English falls back to the
+ * column name title-cased — which is right for `first_name` and wrong
+ * wherever the name carries a unit or an abbreviation. `apr` rendered as
+ * "Apr", which in a table of dates reads as April; `probing_depth_mm`
+ * rendered as "Probing Depth Mm". Every other language had a correct
+ * label and the default language did not.
+ *
+ * Deliberately not one entry per field: 263 fields carry translations,
+ * and title-casing is right for almost all of them. Listing the rest
+ * would be 250 lines asserting that "First Name" is "First Name".
+ */
+export const FIELD_EN: Record<string, string> = {
+  apr: "APR",
+  bpe_code: "BPE code",
+  default_interval_months: "Default interval (months)",
+  duration_minutes: "Duration (minutes)",
+  interval_months: "Interval (months)",
+  pdf: "PDF",
+  probing_depth_mm: "Probing depth (mm)",
+  recession_mm: "Recession (mm)",
+  turnaround_days: "Turnaround (days)",
+  wait_target_days: "Wait target (days)",
+};
+
 export const FIELDS: Record<string, T3> = {
   // shared
   clinic:             ["Praxis", "Praktijk", "Cabinet"],
