@@ -767,6 +767,56 @@ async function main() {
   check("twelve global bookmarks, all translated", presets.length === 12 && unresolved.length === 0,
     `${presets.length} bookmarks`);
 
+  /* ---------- the money adds up ---------------------------------------- */
+  // Invoice headers are written by a flow, not by hand, so nothing in the
+  // schema stops them drifting from the lines they claim to total. This
+  // caught a real one: deleting treatment records set invoice_lines'
+  // relation to null, the seed's idempotency key stopped matching, a
+  // second line was appended for the same work and every subtotal doubled.
+  {
+    const invoices = await rows("/items/invoices?limit=-1&fields=id,number,subtotal,total,tax_rate");
+    const lines = await rows("/items/invoice_lines?limit=-1&fields=invoice,amount");
+    const summed = new Map<string, number>();
+    for (const l of lines) {
+      const id = String(l["invoice"]);
+      summed.set(id, (summed.get(id) ?? 0) + Number(l["amount"] ?? 0));
+    }
+    const drifted = invoices.filter((i) => {
+      const want = Math.round((summed.get(String(i["id"])) ?? 0) * 100) / 100;
+      return Math.abs(Number(i["subtotal"]) - want) > 0.01;
+    });
+    check("no invoice header disagrees with its own lines",
+      invoices.length > 0 && drifted.length === 0,
+      drifted.length
+        ? drifted.map((d) => `${d["number"]}: ${d["subtotal"]} vs ${summed.get(String(d["id"]))}`).join(", ")
+        : `${invoices.length} invoices, ${lines.length} lines`);
+
+    const taxed = invoices.filter((i) => {
+      const rate = Number(i["tax_rate"] ?? 0) / 100;
+      const want = Math.round(Number(i["subtotal"]) * (1 + rate) * 100) / 100;
+      return Math.abs(Number(i["total"]) - want) > 0.01;
+    });
+    check("every total is its subtotal plus the tax rate on the row",
+      taxed.length === 0,
+      taxed.length ? taxed.map((t) => String(t["number"])).join(", ") : `${invoices.length} invoices`);
+  }
+
+  /* ---------- the optional relations are wired, not decorative --------- */
+  // A nullable relation that is null on every row cannot be told apart
+  // from a column nobody finished. Both of these have a field note
+  // promising they point somewhere, so at least one row has to.
+  {
+    const findings = await rows("/items/tooth_conditions?limit=-1&fields=treatment_record");
+    const linked = findings.filter((f) => f["treatment_record"]);
+    check("a chart finding points at the work that produced it",
+      linked.length > 0, `${linked.length} of ${findings.length} findings`);
+
+    const records = await rows("/items/treatment_records?limit=-1&fields=appointment");
+    const seated = records.filter((r) => r["appointment"]);
+    check("treatment records point back at the appointment they were done in",
+      seated.length > 0, `${seated.length} of ${records.length} records`);
+  }
+
   /* ---------- flows ---------------------------------------------------- */
   const flows = await rows("/flows?limit=-1&fields=id,name,status,trigger");
   const inactive = flows.filter((f) => f["status"] !== "active");

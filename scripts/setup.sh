@@ -27,6 +27,24 @@ fi
 set -a; . ./.env; set +a
 PORT="${DIRECTUS_PORT:-8056}"
 
+# Fail with a sentence rather than "pnpm: command not found" or a stack
+# trace from a Node that predates the syntax this uses.
+for tool in docker curl; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "  ✗ $tool is required and is not on PATH."; exit 1; }
+done
+command -v pnpm >/dev/null 2>&1 || {
+  cat <<'NEED'
+  ✗ pnpm is required and is not on PATH.
+      npm install -g pnpm   — or see https://pnpm.io/installation
+NEED
+  exit 1
+}
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "${NODE_MAJOR}" -lt 18 ]; then
+  echo "  ✗ Node 18.17 or newer is required; this is $(node -v 2>/dev/null || echo 'not installed')."
+  exit 1
+fi
+
 say "Building the tooth-chart extension"
 # dist/ is gitignored, so a fresh clone has no compiled interface and the
 # patients form would show a missing field.

@@ -1263,10 +1263,14 @@ export const STRINGS: Record<string, { en: string; t: T3 }> = {
     t: ["Wird je Praxis beim Anlegen vergeben.",
         "Per praktijk toegekend bij aanmaken.",
         "Attribué par cabinet à la création."] },
-  enamel_note_pdf: { en: "Rendered by the invoice flow when the status becomes Sent.",
-    t: ["Wird vom Rechnungs-Flow erzeugt, sobald der Status Versendet ist.",
-        "Wordt door de factuur-flow gemaakt zodra de status Verzonden is.",
-        "Généré par le flux de facturation au passage au statut Envoyée."] },
+  // This used to claim the invoice flow rendered the file. No flow does:
+  // Directus flows cannot produce a PDF without a custom extension, and
+  // there is none here. Totals are calculated in the database; the document
+  // comes from wherever the practice does its accounting.
+  enamel_note_pdf: { en: "The invoice as it was sent. Totals are calculated here; the document is uploaded.",
+    t: ["Die Rechnung wie versendet. Summen entstehen hier, das Dokument wird hochgeladen.",
+        "De factuur zoals verzonden. Totalen worden hier berekend, het document wordt geüpload.",
+        "La facture telle qu’envoyée. Les totaux sont calculés ici, le document est téléversé."] },
   enamel_note_treatment_record: { en: "The work that produced this finding, if any.",
     t: ["Die Behandlung, aus der dieser Befund stammt, sofern vorhanden.",
         "De behandeling waaruit deze bevinding volgt, indien van toepassing.",

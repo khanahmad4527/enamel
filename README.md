@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="BSL 1.1" src="https://img.shields.io/badge/licence-BSL_1.1-0D6E63">
   <img alt="Directus 12.3.1" src="https://img.shields.io/badge/Directus-12.3.1-0D6E63">
-  <img alt="access checks" src="https://img.shields.io/badge/checks-32%2F32-2ECDA7">
+  <img alt="access checks" src="https://img.shields.io/badge/checks-105%2F105-2ECDA7">
 </p>
 
 ---
@@ -110,22 +110,39 @@ $ pnpm verify
   PASS  each practice sees only its own patients                     riverside 12, marina 12, overlap 0
   PASS  direct fetch of another practice's patient by id is refused  HTTP 403
   PASS  portal user sees exactly one patient record                  1 visible
+  PASS  an off-guidance recall interval is refused                   HTTP 400
+  PASS  no invoice header disagrees with its own lines               16 invoices, 16 lines
+  ... 93 more
 
-  32/32 checks passed
+  105/105 checks passed
 ```
+
+Twelve of the hundred and five are shown; the run prints every one.
 
 The tenancy checks matter most. The seed creates **two** practices on purpose —
 with only one, a broken tenant filter is invisible, because everything you can
 see happens to be yours.
 
-Eleven of the thirty-two cover provisioning rather than access, because
-provisioning logs its per-item failures instead of throwing: a run can finish
-with the branding half-applied, no bookmarks and a flow missing. They assert
-that the brand kit is in its folder, that four languages are present and the
-same length, that nine bookmarks exist and all resolve through `$t:`, that five
-flows are active, that the tooth-chart interface both loaded *and* is the
-interface the patient form uses — and that posting an impossible FDI number is
-refused, which is the validation claim rather than a description of it.
+Thirty-six of the hundred and five are access and tenancy. Fifty-one are
+clinical: that a BPE code of 4 with an asterisk is stored as two independent
+axes, that a recall interval outside what NICE CG19 allows for the patient's
+age is refused, that all 86 ISO 3950 and ISO 10394 designations are accepted
+and a 86th-plus-one is not, that a clinical record cannot be edited after it
+is filed. Two are the money: no invoice header may disagree with the lines it
+claims to total, and no total may disagree with the tax rate on its own row.
+
+The remaining sixteen cover provisioning, because provisioning logs its
+per-item failures instead of throwing: a run can finish with the branding
+half-applied, no bookmarks and a flow missing. They assert that the brand kit
+is in its folder, that four languages are present and the same length, that
+every `$t:` key the instance references resolves in all four of them, that
+twelve bookmarks exist and all resolve through `$t:`, that seven flows are
+active, that no list renders a raw uuid or a bare enum value where a label was
+configured, that the two nullable relations the field notes describe are
+populated on at least one row rather than null everywhere, and that the
+tooth-chart interface both loaded *and* is the interface the patient form uses
+— plus that posting an impossible FDI number is refused, which is the
+validation claim rather than a description of it.
 
 One of them is a regression guard with a story: it fails any flow whose
 `item-update` takes a whole `item-read` result as its `key`, because two of them
@@ -133,7 +150,7 @@ did, and on Directus 11 that rewrites every row in the collection.
 
 Writing these found a bug immediately, and not in provisioning. Sabotaging the
 instance on purpose — deactivating a flow, renaming the brand folder — produced
-32/32 anyway. `CACHE_AUTO_PURGE` defaults to false, so Directus was serving a
+a clean pass anyway. `CACHE_AUTO_PURGE` defaults to false, so Directus was serving a
 read cache that a write never invalidated: the database said `inactive` while
 the API said `active`. It is `true` in the compose file now. A check that cannot
 observe a change cannot fail, and a suite that cannot fail is decoration.
@@ -794,7 +811,7 @@ It is not the right tool for *this* repo, for three reasons:
   → running practice, from nothing. There is no source instance to pull
   from.
 - **It skips two things this project needs.** `directus_presets` is out
-  of scope, so the nine global bookmarks would not travel. And settings
+  of scope, so the twelve global bookmarks would not travel. And settings
   sync deliberately strips `project_logo`, `public_favicon`,
   `public_background` and `public_foreground`, because `directus_files`
   is not synced — so the whole visual identity would arrive blank.
@@ -845,14 +862,18 @@ Two ways past it:
 
 Both are tested from an empty database: the access-model half passed
 21/21 on a clean 12.3.1 with an OIG key, and 21/21 on 11.17.4 with no key
-at all. The suite has since grown to 32 — the extra eleven cover
-provisioning, and have only been run against an existing instance.
+at all. Those are the figures the clean-database runs measured, and they
+are left as measured. The suite has since grown to 105 — the additions
+cover clinical rules, the invoice arithmetic and provisioning, and have
+only been run against an existing instance.
 
 ### What else changed, measured rather than assumed
 
-- The tooth-chart interface **loads and enables on 12.x despite declaring
+- The tooth-chart interface **loaded and enabled on 12.x while declaring
   `host: ^11.0.0`** — that range drives a Marketplace compatibility
-  warning, not a load-time gate.
+  warning, not a load-time gate. It now declares
+  `^11.0.0 || ^12.0.0`, which is honest about where it has been run
+  rather than relying on the gate being absent.
 - Migrating an 11.17.4 database in place to 12.3.1 kept all 21 access
   checks passing; no data work was needed.
 - **Two theme keys moved, and Directus does not tell you.** An unknown

@@ -17,5 +17,8 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
-  "license": "BUSL-1.1"
+  "license": "BUSL-1.1",
+  "engines": {
+    "node": ">=18.17"
+  }
 }

@@ -97,6 +97,20 @@ const ADULT_TEETH = [
 
 const CONDITIONS = ["healthy","healthy","healthy","caries","filled","filled","crown","root_canal","missing"] as const;
 
+// What a completed treatment leaves on the chart. Restorative and surgical
+// work changes the recorded state of the tooth it was done on, which is the
+// whole reason `tooth_conditions.treatment_record` exists: a chart entry
+// reading "crown" should be able to answer "placed when, by whom, for how
+// much". Diagnostic and preventive codes are absent on purpose — a check-up
+// does not restore anything.
+const TREATMENT_OUTCOME: Record<string, string> = {
+  D2140: "filled",     // amalgam restoration
+  D2391: "filled",     // composite restoration
+  D2740: "crown",      // porcelain crown
+  D3310: "root_canal", // endodontic treatment
+  D7140: "missing",    // extraction
+};
+
 async function findOrCreate<T extends Row>(
   collection: string,
   match: Record<string, string>,
@@ -922,32 +936,89 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
     }
 
     // --- treatment records + invoices ---------------------------------
-    let records = 0, invoiced = 0;
+    let records = 0, invoiced = 0, recharted = 0;
     for (let i = 0; i < 10; i++) {
       const patient = pick(patients, i * 3);
       const treatment = pick(treatments, i);
       const meta = pick(TREATMENTS, i);
       const existing = await must<Row[]>("find record",
-        api.get(`/items/treatment_records?limit=1&filter[patient][_eq]=${patient.id}&filter[treatment][_eq]=${treatment.id}`));
-      if (existing.length) continue;
+        api.get(`/items/treatment_records?limit=1&fields=id,appointment&filter[patient][_eq]=${patient.id}&filter[treatment][_eq]=${treatment.id}`));
 
-      const record = await must<Row>("create record", api.post("/items/treatment_records", {
-        clinic: clinic.id,
-        patient: patient.id,
-        treatment: treatment.id,
-        practitioner: i % 2 === 0 ? users.dentist! : users.owner!,
-        tooth: meta.requires_tooth ? pick(ADULT_TEETH, i * 4) : null,
-        surfaces: meta.requires_tooth ? (i % 2 === 0 ? "O" : "M,O") : null,
-        performed_at: at(-((i % 12) + 1), 10),
-        price: meta.default_price,
-        status: i % 5 === 0 ? "planned" : "completed",
-      }));
-      records++;
+      // Link the record to a real appointment for that patient where one
+      // exists. The relation was always nullable and always null, which
+      // makes it look decorative rather than optional.
+      const theirAppointments = await must<Row[]>("find appointment",
+        api.get(`/items/appointments?limit=1&sort=-starts_at&fields=id` +
+                `&filter[patient][_eq]=${patient.id}&filter[status][_eq]=completed`));
+
+      const tooth = meta.requires_tooth ? pick(ADULT_TEETH, i * 4) : null;
+      const status = i % 5 === 0 ? "planned" : "completed";
+
+      let record: Row;
+      if (existing[0]) {
+        record = existing[0];
+        const linkedTo = (record as Row & { appointment?: string | null }).appointment;
+        // Reconcile the appointment link rather than only setting it at
+        // creation. Setting a relation once, on insert, means every
+        // instance that predates the relation keeps it null forever and
+        // the field looks decorative — which is how it looked here.
+        if (!linkedTo && theirAppointments[0]) {
+          await must("link record to appointment",
+            api.patch(`/items/treatment_records/${record.id}`, { appointment: theirAppointments[0].id }));
+        }
+      } else {
+        record = await must<Row>("create record", api.post("/items/treatment_records", {
+          clinic: clinic.id,
+          patient: patient.id,
+          appointment: theirAppointments[0]?.id ?? null,
+          treatment: treatment.id,
+          practitioner: i % 2 === 0 ? users.dentist! : users.owner!,
+          tooth,
+          surfaces: meta.requires_tooth ? (i % 2 === 0 ? "O" : "M,O") : null,
+          // Two of the ten are done today, so "Work completed today" opens
+          // on something. A bookmark that is empty on the day you seed the
+          // database reads as broken rather than as accurate.
+          performed_at: i < 2 ? at(0, 9 + i) : at(-((i % 12) + 1), 10),
+          price: meta.default_price,
+          status,
+        }));
+        records++;
+      }
+
+      // Completed work writes itself onto the chart. The finding for that
+      // tooth is created if the patient has none, updated if they do —
+      // either way it points back at the record that produced it, which is
+      // what the field note on `treatment_record` promises. Planned work
+      // changes nothing: nobody has picked up a handpiece yet.
+      const outcome = tooth && status === "completed" ? TREATMENT_OUTCOME[meta.code] : undefined;
+      if (tooth && outcome) {
+        const finding = await must<Row[]>("find finding",
+          api.get(`/items/tooth_conditions?limit=1&fields=id` +
+                  `&filter[patient][_eq]=${patient.id}&filter[tooth][_eq]=${tooth}`));
+        const chart = {
+          condition: outcome,
+          treatment_record: record.id,
+          recorded_at: i < 2 ? at(0, 9 + i) : at(-((i % 12) + 1), 10),
+        };
+        if (finding[0]) await must("chart the outcome", api.patch(`/items/tooth_conditions/${finding[0].id}`, chart));
+        else await must("chart the outcome", api.post("/items/tooth_conditions", {
+          clinic: clinic.id, patient: patient.id, tooth,
+          surface: outcome === "missing" ? "whole" : (meta.code === "D2740" ? "whole" : "O"),
+          ...chart,
+        }));
+        recharted++;
+      }
 
       if (i % 5 === 0) continue; // planned work isn't billed yet
 
+      // findOrCreate rather than post, keyed on the number. The number is
+      // derived from a counter, so a re-run over data that has invoices
+      // but no treatment records — which is what you get if somebody
+      // clears one collection and not the other — collided on the unique
+      // constraint and aborted the seed. "Re-running is safe" is a claim
+      // this repo makes; it has to survive a half-tidied database.
       const number = `${practice.slug.toUpperCase().slice(0, 3)}-INV-${String(1000 + i).slice(-4)}`;
-      const invoice = await must<Row>("create invoice", api.post("/items/invoices", {
+      const invoice = await findOrCreate<Row>("invoices", { number }, {
         clinic: clinic.id,
         patient: patient.id,
         number,
@@ -958,12 +1029,19 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
         subtotal: meta.default_price,
         total: Math.round(meta.default_price * 1.21 * 100) / 100,
         paid_at: i % 3 === 0 ? at(-((i % 12) + 1) + 5, 14) : null,
-      }));
-      await api.post("/items/invoice_lines", {
+      });
+      // Keyed on invoice + description, because the line is what the totals
+      // flow sums: posting it twice doubles the invoice. Not keyed on the
+      // treatment record, which is exactly the mistake worth recording —
+      // deleting treatment records sets this column to null (a charge that
+      // has been billed outlives the clinical row), so a key on it stops
+      // matching and the next run appends a second line for the same work.
+      const description = `${meta.code} — ${meta.name}`;
+      await findOrCreate<Row>("invoice_lines", { invoice: invoice.id, description }, {
         clinic: clinic.id,
         invoice: invoice.id,
         treatment_record: record.id,
-        description: `${meta.code} — ${meta.name}`,
+        description,
         quantity: 1,
         unit_price: meta.default_price,
         amount: meta.default_price,
@@ -971,7 +1049,7 @@ export async function seed(roleIds: Map<string, string>): Promise<void> {
       });
       invoiced++;
     }
-    log.made(`  ${records} treatment records, ${invoiced} invoices`);
+    log.made(`  ${records} new treatment records, ${invoiced} invoices, ${recharted} charted outcomes`);
 
     // --- one patient-portal login ------------------------------------
     // --- documents ------------------------------------------------------

@@ -14,5 +14,9 @@
     "reset": "./scripts/teardown.sh && ./scripts/setup.sh",
     "setup": "./scripts/setup.sh",
     "teardown": "./scripts/teardown.sh"
-  }
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "packageManager": "pnpm@9.12.3"
 }
