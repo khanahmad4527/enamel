@@ -42,7 +42,7 @@ export const treatments: Collection = {
       meta: {
         interface: "input", width: "half", note: "$t:enamel_note_duration",
         validation: { duration_minutes: { _between: [5, 480] } },
-        validation_message: "Chair time must be between 5 and 480 minutes.",
+        validation_message: "$t:enamel_vm_duration",
       },
       schema: { default_value: 30 },
     },
@@ -52,7 +52,7 @@ export const treatments: Collection = {
       meta: {
         interface: "input", width: "half", display: "formatted-value", display_options: { prefix: "€ " },
         validation: { default_price: { _gte: 0 } },
-        validation_message: "A price cannot be negative.",
+        validation_message: "$t:enamel_vm_price_neg",
       },
       schema: { numeric_precision: 10, numeric_scale: 2, default_value: 0 },
     },
@@ -151,7 +151,7 @@ export const treatmentRecords: Collection = {
       meta: {
         interface: "input", width: "half", display: "formatted-value", display_options: { prefix: "€ " },
         validation: { price: { _gte: 0 } },
-        validation_message: "A price cannot be negative.",
+        validation_message: "$t:enamel_vm_price_neg",
       },
       schema: { numeric_precision: 10, numeric_scale: 2, default_value: 0 },
     },

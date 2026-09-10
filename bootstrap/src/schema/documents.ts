@@ -89,7 +89,7 @@ export const documents: Collection = {
         interface: "datetime", width: "half",
         note: "$t:enamel_note_taken_on",
         validation: { taken_on: { _lte: "$NOW" } },
-        validation_message: "A document cannot be dated in the future.",
+        validation_message: "$t:enamel_vm_doc_future",
       },
       schema: {},
     },

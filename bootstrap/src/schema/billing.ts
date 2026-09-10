@@ -57,7 +57,7 @@ export const invoices: Collection = {
       meta: {
         interface: "input", width: "half", display: "formatted-value", display_options: { suffix: " %" },
         validation: { tax_rate: { _between: [0, 100] } },
-        validation_message: "VAT must be between 0 and 100 percent.",
+        validation_message: "$t:enamel_vm_vat",
       },
       schema: { numeric_precision: 5, numeric_scale: 2, default_value: 0 },
     },
@@ -116,7 +116,7 @@ export const invoiceLines: Collection = {
       meta: {
         interface: "input", width: "half",
         validation: { quantity: { _gt: 0 } },
-        validation_message: "Quantity must be at least 1.",
+        validation_message: "$t:enamel_vm_quantity",
       },
       schema: { default_value: 1 },
     },
@@ -138,7 +138,7 @@ export const invoiceLines: Collection = {
         display_options: { prefix: "€ " },
         note: "$t:enamel_note_amount",
         validation: { amount: { _gte: 0 } },
-        validation_message: "An amount cannot be negative.",
+        validation_message: "$t:enamel_vm_amount_neg",
       },
       schema: { numeric_precision: 12, numeric_scale: 2, default_value: 0 },
     },

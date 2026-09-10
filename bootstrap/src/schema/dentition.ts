@@ -207,7 +207,7 @@ export const dentition: Collection = {
         interface: "datetime", width: "half",
         note: "$t:enamel_note_assessed_on",
         validation: { assessed_on: { _lte: "$NOW" } },
-        validation_message: "An assessment cannot be dated in the future.",
+        validation_message: "$t:enamel_vm_assessed_future",
       },
       schema: {},
     },

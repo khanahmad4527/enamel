@@ -73,8 +73,7 @@ export const recallTypes: Collection = {
         interface: "input", width: "half",
         note: "$t:enamel_note_default_interval",
         validation: { default_interval_months: { _in: [3, 6, 9, 12, 15, 18, 21, 24] } },
-        validation_message:
-          "NICE CG19 assigns recall intervals in 3-month steps: 3–12 months under 18, 3–24 months at 18 and over.",
+        validation_message: "$t:enamel_vm_nice_default",
       },
       schema: { default_value: 6 },
     },
@@ -184,8 +183,7 @@ export const recalls: Collection = {
         interface: "input", required: true, width: "half",
         note: "$t:enamel_note_interval_months",
         validation: { interval_months: { _in: [3, 6, 9, 12, 15, 18, 21, 24] } },
-        validation_message:
-          "NICE CG19: 3-month steps only. Under 18, the longest interval is 12 months; at 18 and over, 24.",
+        validation_message: "$t:enamel_vm_nice_interval",
       },
       schema: { is_nullable: false, default_value: 6 },
     },
@@ -330,7 +328,7 @@ export const recalls: Collection = {
         note: "$t:enamel_note_disable_until_balance",
         display: "formatted-value", display_options: { prefix: "€ " },
         validation: { disable_until_balance_under: { _gte: 0 } },
-        validation_message: "A balance threshold cannot be negative.",
+        validation_message: "$t:enamel_vm_balance_neg",
       },
       schema: { numeric_precision: 10, numeric_scale: 2 },
     },

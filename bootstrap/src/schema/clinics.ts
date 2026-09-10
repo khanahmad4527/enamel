@@ -34,7 +34,7 @@ export const clinics: Collection = {
         options: { trim: true, placeholder: "riverside-dental" },
         note: "$t:enamel_note_slug",
         validation: { slug: { _regex: "^[a-z0-9]+(-[a-z0-9]+)*$" } },
-        validation_message: "Lowercase letters, numbers and single hyphens only.",
+        validation_message: "$t:enamel_vm_slug",
       },
       schema: { is_unique: true },
     },
@@ -90,7 +90,7 @@ export const clinics: Collection = {
       meta: {
         interface: "input", options: { iconLeft: "mail" }, width: "half",
         validation: { email: { _regex: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$" } },
-        validation_message: "Enter a valid email address.",
+        validation_message: "$t:enamel_vm_email",
       },
       schema: {},
     },

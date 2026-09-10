@@ -645,6 +645,54 @@ async function main() {
   check("field labels carry their own translations", translated.length >= 15,
     `${translated.length} of ${patientFields.length} patient fields`);
 
+  /* ---------- every $t: reference resolves ---------------------------- */
+  //
+  // The check that should have existed from the start. Three keys had
+  // fallen out of the dictionary while the fields still referenced them —
+  // and because this instance kept the rows from an older provision,
+  // nothing looked wrong here while a fresh clone rendered the raw
+  // "$t:enamel_note_reminder" on screen.
+  //
+  // It walks what the instance actually holds rather than the source, so
+  // it catches a reference nobody defined AND a translation somebody
+  // deleted by hand.
+  {
+    const strings = await rows("/translations?limit=-1&fields=key,language");
+    const defined = new Set(strings.map((t) => `${t["key"]}::${t["language"]}`));
+    const languages = [...new Set(strings.map((t) => String(t["language"])))];
+
+    const referenced = new Set<string>();
+    const eat = (v: unknown): void => {
+      if (typeof v === "string") {
+        if (v.startsWith("$t:")) referenced.add(v.slice(3));
+      } else if (Array.isArray(v)) v.forEach(eat);
+      else if (v && typeof v === "object") Object.values(v as Record<string, unknown>).forEach(eat);
+    };
+
+    for (const c of collections) eat((c as Record<string, unknown>)["meta"]);
+    const allFields = await rows("/fields");
+    for (const f of allFields) eat(f["meta"]);
+    for (const p of await rows("/presets?limit=-1&fields=bookmark")) eat(p["bookmark"]);
+    for (const p of await rows("/policies?limit=-1&fields=name")) eat(p["name"]);
+
+    // Only our own namespace. Directus puts `$t:` references of its own on
+    // system fields — `field_options.directus_activity.create` and 177
+    // others — and those resolve from its bundled i18n, not from
+    // directus_translations. Asserting on them would fail forever and
+    // prove nothing.
+    const ours = [...referenced].filter((k) => k.startsWith("enamel_"));
+    const unresolved = ours.filter(
+      (k) => !languages.every((l) => defined.has(`${k}::${l}`)),
+    );
+    check(
+      "every $t: reference in the instance resolves in all four languages",
+      ours.length > 0 && unresolved.length === 0,
+      unresolved.length
+        ? `${unresolved.length} unresolved: ${unresolved.slice(0, 4).join(", ")}`
+        : `${ours.length} enamel references, all present in ${languages.length} languages`,
+    );
+  }
+
   /* ---------- bookmarks ------------------------------------------------ */
   const presets = (await rows("/presets?limit=-1&fields=id,bookmark,collection,user"))
     .filter((p) => p["user"] === null && p["bookmark"]);

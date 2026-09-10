@@ -208,7 +208,7 @@ export const medicalHistories: Collection = {
         interface: "datetime", required: true, width: "half",
         note: "$t:enamel_note_history_taken_on",
         validation: { taken_on: { _lte: "$NOW" } },
-        validation_message: "A history cannot have been taken in the future.",
+        validation_message: "$t:enamel_vm_history_future",
       },
       schema: { is_nullable: false },
     },

@@ -177,10 +177,7 @@ export const ALL_TOOTH_CODES = [
  * and a supernumerary behind tooth 1 in the other, and nothing in the
  * value says which.
  */
-export const TOOTH_CODE_MESSAGE =
-  "Not a valid tooth designation. ISO 3950 for natural teeth " +
-  "(11–18, 21–28, 31–38, 41–48 permanent; 51–55, 61–65, 71–75, 81–85 deciduous), " +
-  "ISO 10394 for supernumerary (A1–A8, B1–B8, C1–C8, D1–D8, AB, DC).";
+export const TOOTH_CODE_MESSAGE = "$t:enamel_vm_tooth_code";
 
 /** Attaches a validation filter and the message shown when it fails. */
 export function validated(

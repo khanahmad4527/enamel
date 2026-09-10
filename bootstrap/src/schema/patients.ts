@@ -47,7 +47,7 @@ export const patients: Collection = {
         interface: "datetime", width: "half",
         note: "$t:enamel_note_dob",
         validation: { date_of_birth: { _lte: "$NOW" } },
-        validation_message: "A date of birth cannot be in the future.",
+        validation_message: "$t:enamel_vm_dob_future",
       },
       schema: {},
     },
@@ -74,7 +74,7 @@ export const patients: Collection = {
       meta: {
         interface: "input", options: { iconLeft: "mail" }, width: "half",
         validation: { email: { _regex: EMAIL_RE } },
-        validation_message: "Enter a valid email address, for example name@example.com.",
+        validation_message: "$t:enamel_vm_email_example",
       },
       schema: {},
     },
@@ -86,7 +86,7 @@ export const patients: Collection = {
         // Digits, spaces and the usual separators; permissive enough for
         // every country the demo practices sit in.
         validation: { phone: { _regex: "^[+]?[0-9 ()./-]{6,24}$" } },
-        validation_message: "Use digits, spaces and + ( ) - only, 6 to 24 characters.",
+        validation_message: "$t:enamel_vm_phone",
       },
       schema: {},
     },
