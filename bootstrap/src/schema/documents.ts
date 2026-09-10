@@ -56,7 +56,6 @@ export const documents: Collection = {
         interface: "select-dropdown", width: "half", required: true,
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_doc_radiograph", value: "radiograph", color: "#0D6E63" },
             { text: "$t:enamel_doc_photograph", value: "photograph", color: "#6FD8C8" },

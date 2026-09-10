@@ -645,6 +645,73 @@ async function main() {
   check("field labels carry their own translations", translated.length >= 15,
     `${translated.length} of ${patientFields.length} patient fields`);
 
+  /* ---------- nothing renders as a raw value or an empty cell --------- */
+  //
+  // Two bugs, one shape, and no behavioural check would have found either.
+  // `interface` decides the form; `display` decides the list. A dropdown
+  // with no display showed its raw value — "whole" where the form said
+  // "Hele tand" — and one declaring `labels` without choices to map with
+  // rendered an empty cell for all eight tooth conditions.
+  {
+    const allFields = await rows("/fields");
+    const mineOnly = allFields.filter((f) =>
+      !String(f["collection"]).startsWith("directus_") &&
+      ((f["meta"] ?? {}) as Record<string, unknown>)["interface"] === "select-dropdown",
+    );
+    const bare = mineOnly.filter((f) => {
+      const meta = (f["meta"] ?? {}) as Record<string, unknown>;
+      const choices = ((meta["options"] ?? {}) as { choices?: unknown }).choices;
+      if (!Array.isArray(choices) || choices.length === 0) return false;
+      const dOpts = (meta["display_options"] ?? {}) as { choices?: unknown };
+      return meta["display"] !== "labels" || !Array.isArray(dOpts.choices);
+    });
+    check("every dropdown renders its label in a list, not its raw value",
+      mineOnly.length > 0 && bare.length === 0,
+      bare.length
+        ? `${bare.length} bare: ${bare.slice(0, 3).map((f) => `${f["collection"]}.${f["field"]}`).join(", ")}`
+        : `${mineOnly.length} dropdowns, all mapped`);
+
+    const m2o = allFields.filter((f) => {
+      const meta = (f["meta"] ?? {}) as { special?: unknown; display?: unknown };
+      return !String(f["collection"]).startsWith("directus_") &&
+        Array.isArray(meta.special) && meta.special.includes("m2o");
+    });
+    const keyed = m2o.filter((f) => !((f["meta"] ?? {}) as Record<string, unknown>)["display"]);
+    check("every related field renders a name, not a primary key",
+      m2o.length > 0 && keyed.length === 0,
+      keyed.length ? `${keyed.length} showing raw uuids` : `${m2o.length} relations, all templated`);
+  }
+
+  /* ---------- the public surface is closed --------------------------- */
+  //
+  // Nothing asserted this, which made it the likeliest thing to leak: a
+  // `read *` granted to the public policy by accident would have passed
+  // all 95 other checks. It is checked from outside, with no token at
+  // all, because that is how a stranger arrives.
+  {
+    const publicPolicies = (await rows("/policies?limit=-1&fields=id,name"))
+      .filter((p) => String(p["name"]).toLowerCase().includes("public") ||
+        String(p["name"]) === "$t:enamel_public_label");
+    const publicIds = new Set(publicPolicies.map((p) => String(p["id"])));
+    const publicRules = (await rows("/permissions?limit=-1&fields=policy,collection,action"))
+      .filter((r) => publicIds.has(String(r["policy"])));
+    check("the public policy grants nothing", publicRules.length === 0,
+      publicRules.length
+        ? publicRules.slice(0, 4).map((r) => `${r["collection"]}:${r["action"]}`).join(", ")
+        : "no rules on any public policy");
+
+    const unauth: string[] = [];
+    for (const collection of tables.map((t) => String(t["collection"]))) {
+      const res = await fetch(`${BASE}/items/${collection}?limit=1`);
+      if (res.status < 400) unauth.push(`${collection} (${res.status})`);
+    }
+    check("no collection answers an unauthenticated request", unauth.length === 0,
+      unauth.length ? unauth.slice(0, 4).join(", ") : `${tables.length} collections, all closed`);
+
+    const assetRes = await fetch(`${BASE}/items/documents?limit=1`);
+    check("patient documents are closed to strangers", assetRes.status >= 400, `HTTP ${assetRes.status}`);
+  }
+
   /* ---------- every $t: reference resolves ---------------------------- */
   //
   // The check that should have existed from the start. Three keys had

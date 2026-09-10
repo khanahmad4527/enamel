@@ -89,7 +89,6 @@ export const dentition: Collection = {
         interface: "select-dropdown", required: true, width: "half",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_dent_permanent", value: "permanent", color: "#0D6E63" },
             { text: "$t:enamel_dent_deciduous", value: "deciduous", color: "#6FD8C8" },
@@ -120,7 +119,6 @@ export const dentition: Collection = {
         note: "$t:enamel_note_tooth_state",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_st_present", value: "present", color: "#2ECDA7" },
             { text: "$t:enamel_st_unerupted", value: "unerupted", color: "#A2B5CD" },

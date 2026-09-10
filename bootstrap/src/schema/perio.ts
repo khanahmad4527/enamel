@@ -181,7 +181,6 @@ export const perioSextants: Collection = {
         note: "$t:enamel_note_bpe_code",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "0", value: 0, color: "#2ECDA7" },
             { text: "1", value: 1, color: "#8FEADC" },
@@ -193,11 +192,11 @@ export const perioSextants: Collection = {
         options: {
           allowNone: true,
           choices: [
-            { text: "0 — no pockets, no calculus, no bleeding", value: 0 },
-            { text: "1 — bleeding on probing", value: 1 },
-            { text: "2 — calculus or overhangs", value: 2 },
-            { text: "3 — probing depth 3.5–5.5mm", value: 3 },
-            { text: "4 — probing depth over 5.5mm", value: 4 },
+            { text: "$t:enamel_bpe_0", value: 0 },
+            { text: "$t:enamel_bpe_1", value: 1 },
+            { text: "$t:enamel_bpe_2", value: 2 },
+            { text: "$t:enamel_bpe_3", value: 3 },
+            { text: "$t:enamel_bpe_4", value: 4 },
           ],
         },
         validation: { _or: [{ bpe_code: { _null: true } }, { bpe_code: { _between: [0, 4] } }] },
@@ -466,10 +465,10 @@ export const perioTeeth: Collection = {
         options: {
           allowNone: true,
           choices: [
-            { text: "0 — physiological", value: 0 },
-            { text: "1 — up to 1mm horizontally", value: 1 },
-            { text: "2 — over 1mm, under 2mm", value: 2 },
-            { text: "3 — horizontal and vertical", value: 3 },
+            { text: "$t:enamel_mob_0", value: 0 },
+            { text: "$t:enamel_mob_1", value: 1 },
+            { text: "$t:enamel_mob_2", value: 2 },
+            { text: "$t:enamel_mob_3", value: 3 },
           ],
         },
         validation: { _or: [{ mobility: { _null: true } }, { mobility: { _between: [0, 3] } }] },
@@ -487,7 +486,7 @@ export const perioTeeth: Collection = {
           choices: [
             { text: "Miller / Lindhe–Nyman", value: "miller_lindhe_nyman" },
             { text: "Glickman", value: "glickman" },
-            { text: "Other", value: "other" },
+            { text: "$t:enamel_generic_other", value: "other" },
           ],
         },
       },
@@ -511,9 +510,9 @@ export const perioTeeth: Collection = {
         options: {
           allowNone: true,
           choices: [
-            { text: "I — probe enters, under a third", value: 1 },
-            { text: "II — over a third, not through", value: 2 },
-            { text: "III — through and through", value: 3 },
+            { text: "$t:enamel_fu_1", value: 1 },
+            { text: "$t:enamel_fu_2", value: 2 },
+            { text: "$t:enamel_fu_3", value: 3 },
           ],
         },
         validation: { _or: [{ [field]: { _null: true } }, { [field]: { _between: [1, 3] } }] },
@@ -580,12 +579,12 @@ export const perioSites: Collection = {
         note: "$t:enamel_note_site",
         options: {
           choices: [
-            { text: "MB — mesiobuccal", value: "MB" },
-            { text: "B — mid-buccal", value: "B" },
-            { text: "DB — distobuccal", value: "DB" },
-            { text: "ML — mesiolingual / mesiopalatal", value: "ML" },
-            { text: "L — mid-lingual / palatal", value: "L" },
-            { text: "DL — distolingual / distopalatal", value: "DL" },
+            { text: "$t:enamel_site_mb", value: "MB" },
+            { text: "$t:enamel_site_b", value: "B" },
+            { text: "$t:enamel_site_db", value: "DB" },
+            { text: "$t:enamel_site_ml", value: "ML" },
+            { text: "$t:enamel_site_l", value: "L" },
+            { text: "$t:enamel_site_dl", value: "DL" },
           ],
         },
       },

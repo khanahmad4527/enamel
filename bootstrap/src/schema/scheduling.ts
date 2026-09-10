@@ -70,10 +70,10 @@ export const appointments: Collection = {
       meta: {
         interface: "select-dropdown", width: "half",
         options: { allowOther: true, choices: [
-          { text: "Check-up", value: "checkup" }, { text: "Hygiene", value: "hygiene" },
-          { text: "Filling", value: "filling" }, { text: "Extraction", value: "extraction" },
-          { text: "Root canal", value: "root_canal" }, { text: "Crown fit", value: "crown" },
-          { text: "Emergency", value: "emergency" }, { text: "Consultation", value: "consultation" },
+          { text: "$t:enamel_rsn_checkup", value: "checkup" }, { text: "$t:enamel_rsn_hygiene", value: "hygiene" },
+          { text: "$t:enamel_rsn_filling", value: "filling" }, { text: "$t:enamel_rsn_extraction", value: "extraction" },
+          { text: "$t:enamel_cond_root_canal", value: "root_canal" }, { text: "$t:enamel_rsn_crown", value: "crown" },
+          { text: "$t:enamel_rsn_emergency", value: "emergency" }, { text: "$t:enamel_rsn_consultation", value: "consultation" },
         ] },
       },
       schema: {},

@@ -67,7 +67,6 @@ export const treatmentPlans: Collection = {
         note: "$t:enamel_note_plan_status",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_tp_active", value: "active", color: "#2ECDA7" },
             { text: "$t:enamel_tp_inactive", value: "inactive", color: "#A2B5CD" },
@@ -276,7 +275,6 @@ export const treatmentPlanItems: Collection = {
         interface: "select-dropdown", required: true, width: "half",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_pi_proposed", value: "proposed", color: "#A2B5CD" },
             { text: "$t:enamel_pi_accepted", value: "accepted", color: "#2ECDA7" },

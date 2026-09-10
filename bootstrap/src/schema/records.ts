@@ -71,7 +71,6 @@ export const clinicalNotes: Collection = {
         interface: "select-dropdown", required: true, width: "half",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_cn_examination", value: "examination", color: "#0D6E63" },
             { text: "$t:enamel_cn_treatment", value: "treatment", color: "#2ECDA7" },
@@ -343,7 +342,6 @@ export const patientFindings: Collection = {
         interface: "select-dropdown", required: true, width: "half",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_pf_allergy", value: "allergy", color: "#E35169" },
             { text: "$t:enamel_pf_medication", value: "medication", color: "#3399FF" },
@@ -382,7 +380,6 @@ export const patientFindings: Collection = {
         note: "$t:enamel_note_finding_status",
         display: "labels",
         display_options: {
-          showAsDot: true,
           choices: [
             { text: "$t:enamel_s_active", value: "active", color: "#2ECDA7" },
             { text: "$t:enamel_s_inactive", value: "inactive", color: "#A2B5CD" },

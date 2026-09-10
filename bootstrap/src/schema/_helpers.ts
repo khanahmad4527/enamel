@@ -77,6 +77,15 @@ export const status = (
   meta: {
     interface: "select-dropdown",
     display: "labels",
+    /**
+     * The dot stays here and nowhere else. `status()` is the two-value
+     * archive switch — active or archived, live or void — where the
+     * colour is the whole message and a word beside it is noise.
+     *
+     * A dot on a set of three or eight is a different thing: nobody can
+     * tell caries from a crown, or agreed from disagreed, by hue. Those
+     * fields render their label.
+     */
     display_options: { showAsDot: true, choices },
     options: { choices },
     width: "half",
@@ -241,4 +250,50 @@ export function withRelatedDisplay(field: Field): Field {
     ...field,
     meta: { ...meta, display: "related-values", display_options: { template } },
   };
+}
+
+/**
+ * Gives every dropdown a display as well as an interface.
+ *
+ * The same trap as `withRelatedDisplay`, one field type over: a
+ * `select-dropdown` with no `display` renders its raw *value* in a list.
+ * So `tooth_conditions.surface` showed "whole" instead of "Whole tooth",
+ * and — worse, since sixty labels were just translated — a Dutch user got
+ * "whole" where the form beside it says "Hele tand". Thirty-one fields
+ * were like that.
+ *
+ * `labels` reuses the interface's own choices, so a label and its
+ * translation are defined once. No `showAsDot`: a dot is right where the
+ * colour carries the meaning, and these are words.
+ */
+export function withChoiceDisplay(field: Field): Field {
+  const meta = field.meta as Record<string, unknown> | undefined;
+  if (!meta || meta["interface"] !== "select-dropdown") return field;
+  const options = (meta["options"] ?? {}) as { choices?: unknown };
+  if (!Array.isArray(options.choices) || options.choices.length === 0) return field;
+
+  const display = meta["display"];
+  const displayOptions = (meta["display_options"] ?? {}) as Record<string, unknown>;
+
+  // Nothing declared: give it the labels display and the interface's own
+  // choices.
+  if (!display) {
+    return {
+      ...field,
+      meta: { ...meta, display: "labels", display_options: { ...displayOptions, choices: options.choices } },
+    };
+  }
+
+  // Declared `labels` but no choices to map with — which renders an empty
+  // cell, or a bare dot if showAsDot is set. This was the `condition`
+  // column: eight distinct findings and nothing on screen for any of
+  // them. Fill the choices in and leave everything else as declared.
+  if (display === "labels" && !Array.isArray(displayOptions["choices"])) {
+    return {
+      ...field,
+      meta: { ...meta, display_options: { ...displayOptions, choices: options.choices } },
+    };
+  }
+
+  return field;
 }

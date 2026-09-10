@@ -1,5 +1,5 @@
 import type { Collection } from "../types.js";
-import { withRelatedDisplay } from "./_helpers.js";
+import { withRelatedDisplay, withChoiceDisplay } from "./_helpers.js";
 import { clinics, rooms } from "./clinics.js";
 import { patients } from "./patients.js";
 import { appointments } from "./scheduling.js";
@@ -15,8 +15,8 @@ import { documents } from "./documents.js";
 
 import { userFields as rawUserFields, fileFields as rawFileFields } from "./users.js";
 
-export const userFields = rawUserFields.map(withRelatedDisplay);
-export const fileFields = rawFileFields.map(withRelatedDisplay);
+export const userFields = rawUserFields.map(withRelatedDisplay).map(withChoiceDisplay);
+export const fileFields = rawFileFields.map(withRelatedDisplay).map(withChoiceDisplay);
 
 /** Sidebar folders. Created before the collections that sit in them. */
 export const groups: Collection[] = [
@@ -73,5 +73,5 @@ const declared: Collection[] = [
 
 export const collections: Collection[] = declared.map((c) => ({
   ...c,
-  fields: c.fields.map(withRelatedDisplay),
+  fields: c.fields.map(withRelatedDisplay).map(withChoiceDisplay),
 }));

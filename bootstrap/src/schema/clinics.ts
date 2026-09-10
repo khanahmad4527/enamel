@@ -46,6 +46,14 @@ export const clinics: Collection = {
       "active",
     ),
     {
+      /**
+       * Timezones, currencies and — further down — the patient's
+       * preferred language are deliberately NOT translated. An IANA
+       * identifier is the same string in every locale, a currency code is
+       * an ISO 4217 code, and a language is shown in its own language
+       * because that is who is reading it: "Nederlands" is more use to a
+       * Dutch speaker than "Dutch" rendered in German.
+       */
       field: "timezone",
       type: "string",
       meta: {
@@ -98,8 +106,8 @@ export const clinics: Collection = {
     { field: "address", type: "text", meta: { interface: "input-multiline", width: "full" }, schema: {} },
     { field: "city", type: "string", meta: { interface: "input", width: "half" }, schema: {} },
     { field: "country", type: "string", meta: { interface: "select-dropdown", width: "half", options: { allowOther: true, choices: [
-      { text: "Netherlands", value: "NL" }, { text: "Germany", value: "DE" }, { text: "Portugal", value: "PT" },
-      { text: "Türkiye", value: "TR" }, { text: "UAE", value: "AE" }, { text: "India", value: "IN" },
+      { text: "$t:enamel_co_nl", value: "NL" }, { text: "$t:enamel_co_de", value: "DE" }, { text: "$t:enamel_co_pt", value: "PT" },
+      { text: "$t:enamel_co_tr", value: "TR" }, { text: "$t:enamel_co_ae", value: "AE" }, { text: "$t:enamel_co_in", value: "IN" },
     ] } }, schema: {} },
     ...timestamps(),
   ],

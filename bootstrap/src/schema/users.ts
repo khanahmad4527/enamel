@@ -30,12 +30,12 @@ export const userFields: Field[] = [
       note: "Display only — access comes from the assigned role and policies.",
       options: {
         choices: [
-          { text: "Principal dentist", value: "principal_dentist" },
-          { text: "Associate dentist", value: "associate_dentist" },
-          { text: "Dental hygienist", value: "hygienist" },
-          { text: "Dental nurse", value: "nurse" },
-          { text: "Receptionist", value: "receptionist" },
-          { text: "Practice manager", value: "practice_manager" },
+          { text: "$t:enamel_jt_principal", value: "principal_dentist" },
+          { text: "$t:enamel_jt_associate", value: "associate_dentist" },
+          { text: "$t:enamel_jt_hygienist", value: "hygienist" },
+          { text: "$t:enamel_jt_nurse", value: "nurse" },
+          { text: "$t:enamel_jt_receptionist", value: "receptionist" },
+          { text: "$t:enamel_jt_manager", value: "practice_manager" },
         ],
       },
     },
