@@ -1,0 +1,22 @@
+# One install, one lockfile, and a place for code that more than one app
+# needs. The immediate reason is wall-clock arithmetic: the same forty
+# lines of timezone handling existed three times — in the provisioning
+# seed, in the core service and in the day-sheet extension — because there
+# was no workspace to put it in and three independently built packages
+# with no way to share.
+packages:
+  - "apps/*"
+  - "apps/directus/bootstrap"
+  - "apps/directus/extensions/*"
+  - "packages/*"
+
+# Native binaries that genuinely need their install script.
+#
+# pnpm 10 refuses to run lifecycle scripts by default, which is the right
+# default — an install should not execute arbitrary code from the tree.
+# These three are the exceptions this repo actually needs: esbuild and
+# workerd ship a platform binary their script unpacks, and without it the
+# patient site has no runtime to start in.
+onlyBuiltDependencies:
+  - esbuild
+  - workerd

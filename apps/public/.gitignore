@@ -1,0 +1,4 @@
+.dev.vars
+dist/
+.react-router/
+.wrangler/

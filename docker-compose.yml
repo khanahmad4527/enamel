@@ -1,0 +1,300 @@
+# Enamel — local stack.
+# Postgres holds the data, Redis backs the cache and flow queue, Directus
+# serves the API and admin. Extensions and uploads are bind-mounted so a
+# rebuild never loses them.
+
+services:
+  database:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-enamel}
+      POSTGRES_USER: ${DB_USER:-enamel}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    # Bound to loopback, not 0.0.0.0: the provisioning step runs on the
+    # host and applies DDL that Directus has no endpoint for — exclusion
+    # constraints, CHECKs, triggers. Directus and the core service reach the
+    # database over the compose network and do not use this.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - ./data/database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-enamel}", "-d", "${DB_DATABASE:-enamel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Directus can only demonstrate the reminder flow if something accepts
+  # the mail. The default sendmail transport pipes to a binary the image
+  # does not contain, so every send failed and the flow's next step never
+  # ran. Mailpit takes SMTP on 1025 and shows what arrived on 8025.
+  mail:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  directus:
+    image: ${DIRECTUS_IMAGE:-directus/directus:11}
+    restart: unless-stopped
+    ports:
+      - "${DIRECTUS_PORT:-9056}:8055"
+    volumes:
+      - ./uploads:/directus/uploads
+      - ./apps/directus/extensions:/directus/extensions
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    environment:
+      SECRET: ${SECRET:?set SECRET in .env}
+      # Derived from the one place the port is declared, so moving the
+      # port cannot leave the admin emitting dead links.
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:${DIRECTUS_PORT:-9056}}
+
+      DB_CLIENT: pg
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-enamel}
+      DB_USER: ${DB_USER:-enamel}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      CACHE_ENABLED: "true"
+      CACHE_STORE: redis
+      REDIS: redis://cache:6379
+
+      # Directus defaults this to false, and the read cache then serves
+      # stale rows after a write until the TTL expires. This repo's whole
+      # loop is "provision, then immediately read back what you
+      # provisioned" — `pnpm verify` did exactly that and reported a flow
+      # as active seconds after the database had it inactive. A test that
+      # cannot see a change cannot fail.
+      CACHE_AUTO_PURGE: "true"
+
+      # The official image runs Directus under PM2 in cluster mode, so
+      # there is more than one worker. Flow and extension reloads are
+      # broadcast between workers over the messenger — without Redis here
+      # only the worker that handled the write learns about a new flow,
+      # and event-triggered flows silently never fire on the others.
+      MESSENGER_STORE: redis
+      SYNCHRONIZATION_STORE: redis
+
+      # Directus 12 runs unlicensed on a free Core tier, but that tier
+      # refuses custom rules on access policies — the entire subject of
+      # this project — and caps user seats at 3. A key restores both.
+      LICENSE_KEY: ${DIRECTUS_LICENSE_KEY:-}
+
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@enamel.dev}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+
+      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@enamel.dev}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-mail}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-1025}
+      EMAIL_SMTP_SECURE: "false"
+      EMAIL_SMTP_IGNORE_TLS: "true"
+
+      # Rate limiting, counted in Redis rather than in memory.
+      #
+      # The store is the part that matters. The official image runs
+      # Directus under PM2 in cluster mode, so there is more than one
+      # worker — and an in-memory limiter gives each worker its own
+      # counter, which means the effective limit is however many workers
+      # happen to be running. The number in this file would quietly stop
+      # describing the system.
+      RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED:-true}
+      RATE_LIMITER_STORE: redis
+      RATE_LIMITER_REDIS: redis://cache:6379
+      RATE_LIMITER_POINTS: ${RATE_LIMITER_POINTS:-100}
+      RATE_LIMITER_DURATION: ${RATE_LIMITER_DURATION:-1}
+
+      # And a ceiling for the instance as a whole, so one practice cannot
+      # take the others down by being busy.
+      RATE_LIMITER_GLOBAL_ENABLED: ${RATE_LIMITER_GLOBAL_ENABLED:-true}
+      RATE_LIMITER_GLOBAL_STORE: redis
+      RATE_LIMITER_GLOBAL_REDIS: redis://cache:6379
+      RATE_LIMITER_GLOBAL_POINTS: ${RATE_LIMITER_GLOBAL_POINTS:-2000}
+      RATE_LIMITER_GLOBAL_DURATION: ${RATE_LIMITER_GLOBAL_DURATION:-1}
+
+      # Demo data only. Never point this at a real patient database.
+      EXTENSIONS_AUTO_RELOAD: "true"
+      WEBSOCKETS_ENABLED: "true"
+
+  # The work Directus cannot host. Today that is slot search across five
+  # tables and outbound mail that retries; it is named `core` rather than
+  # `scheduler` because the next thing to land here — rendering an invoice
+  # PDF — is not scheduling and would make the narrower name a lie.
+  #
+  # Reads the database directly, because a slot search through the API is
+  # dozens of round trips. Writes go back through Directus so that
+  # policies, hooks and the audit trail all apply.
+  core:
+    # Built from the repo root, not from apps/core: it depends on
+    # packages/time through the workspace, and a context scoped to its own
+    # folder cannot see it.
+    build:
+      context: .
+      dockerfile: apps/core/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${CORE_PORT:-8057}:8057"
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      directus:
+        condition: service_started
+    environment:
+      CORE_PORT: 8057
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-enamel}
+      DB_USER: ${DB_USER:-enamel}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DIRECTUS_URL: http://directus:8055
+      REMINDER_TOKEN: ${REMINDER_TOKEN:-}
+      # The registrar's credential, and deliberately not the one above: a
+      # token that can create a login is not a token to share with a job
+      # that sets booleans.
+      PORTAL_TOKEN: ${PORTAL_TOKEN:-}
+      MESSAGING_INBOUND_SECRET: ${MESSAGING_INBOUND_SECRET:-}
+      # Which provider each channel talks to. `mock` is the honest default.
+      #
+      # Naming a real one without its credentials does NOT fall back — the
+      # container refuses to start and names the missing variables. A
+      # practice that believes it is texting patients and is not is worse
+      # than one with no SMS at all.
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+      TWILIO_API_BASE: ${TWILIO_API_BASE:-}
+      TWILIO_STATUS_CALLBACK: ${TWILIO_STATUS_CALLBACK:-}
+
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_TEMPLATE: ${WHATSAPP_TEMPLATE:-}
+      WHATSAPP_TEMPLATE_LANGUAGE: ${WHATSAPP_TEMPLATE_LANGUAGE:-}
+      WHATSAPP_API_BASE: ${WHATSAPP_API_BASE:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-}
+
+      # Cards only. Cash and bank transfers are recorded by the desk
+      # adapter and never leave the building whatever this says.
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-mock}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_API_BASE: ${STRIPE_API_BASE:-}
+      REDIS_HOST: cache
+      REDIS_PORT: 6379
+      # Database 1, so a Directus cache flush cannot take the reminder
+      # backlog with it.
+      REDIS_QUEUE_DB: 1
+      EMAIL_SMTP_HOST: mail
+      EMAIL_SMTP_PORT: 1025
+      EMAIL_FROM: ${EMAIL_FROM:-reception@enamel.dev}
+      REMINDER_LEAD_HOURS: ${REMINDER_LEAD_HOURS:-24}
+      REMINDER_SWEEP_MINUTES: ${REMINDER_SWEEP_MINUTES:-15}
+      # Counted in Redis for the same reason Directus's is: this service
+      # can be run as more than one container, and a per-process counter
+      # would multiply the configured limit by however many are running.
+      CORE_RATE_LIMIT_ENABLED: ${CORE_RATE_LIMIT_ENABLED:-true}
+      CORE_RATE_LIMIT_POINTS: ${CORE_RATE_LIMIT_POINTS:-300}
+      CORE_RATE_LIMIT_WINDOW: ${CORE_RATE_LIMIT_WINDOW:-60}
+      # Whose `x-forwarded-for` to believe. The patient site is
+      # server-rendered, so without this every patient shares one address
+      # here and the registration limiter counts them as one caller.
+      # Private ranges only — `true` would let anyone reaching this port
+      # claim to be anybody.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-loopback, linklocal, uniquelocal}
+      # Only used to print the calendar feed URL and the one-time link into
+      # the queue board. Both are opened by a browser, so the container's
+      # own address is the wrong thing to hand out.
+      CORE_PUBLIC_URL: ${CORE_PUBLIC_URL:-http://localhost:${CORE_PORT:-8057}}
+      # The queue board. Reachable only with a one-time link issued to an
+      # administrator's Directus token — see apps/core/src/queues. Turn it
+      # off entirely where there is no reason to expose a queue UI.
+      QUEUE_BOARD_ENABLED: ${QUEUE_BOARD_ENABLED:-true}
+      QUEUE_BOARD_SESSION_MINUTES: ${QUEUE_BOARD_SESSION_MINUTES:-30}
+      # A `secure` cookie is never sent over plain http, which presents as
+      # "the board signs me out the moment I arrive". A deployment behind
+      # TLS sets this to 1.
+      QUEUE_BOARD_SECURE: ${QUEUE_BOARD_SECURE:-0}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8057/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # The patient-facing site.
+  #
+  # React Router v7 running in workerd, which is what Cloudflare runs — so
+  # `pnpm dev`, this container and a real deployment are all the same
+  # runtime, and a Node API that does not exist at the edge fails here
+  # rather than after the first deploy.
+  #
+  # It holds no privileged credential. Every call it makes carries the
+  # patient's own Directus token out of an httpOnly cookie, so the site is
+  # incapable of reading anything the practice has not already decided a
+  # patient may see — including by bug. The single exception is
+  # registration, which has no patient yet and is forwarded to the core
+  # service, where the narrowly-scoped registrar account lives.
+  public:
+    build:
+      context: .
+      dockerfile: apps/public/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-8058}:8058"
+    depends_on:
+      directus:
+        condition: service_started
+      core:
+        condition: service_started
+    environment:
+      PUBLIC_PORT: 8058
+      # Over the compose network, not through the published ports: the
+      # site is server-rendered, so these are reached from inside the
+      # container and localhost there is the container itself.
+      DIRECTUS_URL: http://directus:8055
+      CORE_URL: http://core:8057
+      # Signs the cookie that carries a patient's access token. Rotating
+      # it signs everybody out, which is the correct behaviour if it ever
+      # leaks.
+      PORTAL_SESSION_SECRET: ${PORTAL_SESSION_SECRET:?set PORTAL_SESSION_SECRET in .env}
+      # Reads the practice's *published* content — services, questions,
+      # opening hours, team profiles, retention periods — and is refused
+      # on every clinical collection. Written to .env by the seed.
+      WEBSITE_TOKEN: ${WEBSITE_TOKEN:-}
+      # Off in development, so an edit in Directus shows on the next
+      # refresh rather than up to a minute later. A deployment leaves it
+      # at the 60-second default, where it collapses a burst of traffic
+      # into one query per page.
+      WEBSITE_CACHE_SECONDS: ${WEBSITE_CACHE_SECONDS:-0}
+      # Local development is plain http, and a `secure` cookie is simply
+      # never sent over it — which presents as "signing in does nothing".
+      # A deployment behind TLS sets this to 1.
+      PORTAL_SECURE: ${PORTAL_SECURE:-0}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8058/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

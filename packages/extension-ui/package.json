@@ -1,0 +1,28 @@
+{
+  "name": "@enamel/extension-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The states every Enamel extension has to render, written once. Shared because six copies is how two of them ended up different.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vue": "3.5.42"
+  }
+}

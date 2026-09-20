@@ -1,0 +1,1077 @@
+/*
+ * The patient area.
+ *
+ * The palette is taken from the room the patient is about to sit in
+ * rather than from a template: the cool grey-white of a surgery wall, the
+ * blue of the drape and the bib, steel, and one warm porcelain tone
+ * borrowed from a shade guide. It is deliberately *not* the soft green on
+ * warm cream that every generated health page lands on, and the type is
+ * deliberately not Inter.
+ *
+ * Two rules run through the whole thing:
+ *
+ *   Hierarchy is spent, not sprinkled. One elevated surface per screen —
+ *   the thing that needs doing. Everything else is separated by a
+ *   hairline. A page where every block is a rounded card with a shadow
+ *   has no hierarchy at all, it just has texture.
+ *
+ *   Porcelain marks the patient's own record. It is the only warm tone
+ *   here, so it means something: this bit is about you. Used for
+ *   decoration it would stop meaning anything.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /*
+   * Surfaces — fresh water, not clinical grey.
+   *
+   * The first palette here was steel: a cool grey page with near-black
+   * ink, and in dark mode a #101820 ground that is one step off black.
+   * It photographed as "dark everywhere", and it was. This one is built
+   * to be easy to sit in front of — an airy ice ground with a green-blue
+   * bias, ink that is a deep slate rather than black, and a dark theme
+   * that is soft slate-teal instead of a lights-off room.
+   */
+  --ground: #f0f7f9;
+  --surface: #ffffff;
+  --sunken: #e2eff3;
+  --porcelain: #f7f3ea;
+
+  /* Ink — deep slate with a green-blue bias. Never pure black: on a pale
+     cool ground it vibrates, and a long page of it is tiring. */
+  --ink: #16303a;
+  --ink-2: #45636f;
+  /*
+   * The tertiary tone — eyebrows, table headers, the clinician name
+   * under a slot. It is used on three surfaces and is computed against
+   * the darkest of them, not against the one it was designed on: an
+   * earlier value passed 4.58:1 on the page ground and 4.26:1 on the
+   * sunken grey behind the footer, which nobody had checked. Measured,
+   * never eyeballed — this is the one token that looks fine when wrong.
+   */
+  --ink-3: #52707c;
+
+  --line: #c9dfe6;
+  --line-soft: #dceaef;
+
+  /* Fresh cyan. Water, daylight, a rinsed mouth — the association
+     dentistry actually owns, and the one cool colour that is not the
+     dark teal every generated health page lands on. */
+  --accent: #1978bb;
+  --accent-deep: #125888;
+  --accent-wash: #d9e7f7;
+  --accent-ink: #1667a2;
+  /* Text sitting on the accent. Overridden per practice by the theme,
+     which computes black-or-white from their own colour rather than
+     assuming white reads on it. */
+  --accent-on: #ffffff;
+
+  /* Semantic, and separate from the accent on purpose. */
+  --warn: #8a5a00;
+  --warn-wash: #fdf3e0;
+  --stop: #a32b1e;
+  --stop-wash: #fbeceb;
+  --go: #1f6b4f;
+  --go-wash: #e6f2ec;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  /* One real elevation, for the one thing that gets it. */
+  --lift: 0 1px 2px rgba(19, 30, 41, 0.05), 0 12px 28px -16px rgba(19, 30, 41, 0.35);
+
+  --measure: 64ch;
+
+  /*
+   * One container, one gutter, one spacing scale.
+   *
+   * Before these existed the header measured 880px, the footer 1040px,
+   * the article pages 820px and the reading pages 70ch — five widths on
+   * one site, so nothing lined up with anything above or below it and
+   * the eye read it as carelessness, which it was. Every band, the
+   * header and the footer now share `--container`, and the only thing
+   * allowed to be narrower is running text, which is capped by
+   * `--measure` for legibility rather than by a second width.
+   */
+  --container: 1120px;
+  --gutter: clamp(20px, 5vw, 44px);
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  --section: clamp(56px, 8vw, 96px);
+
+  /* The type ladder. Headings step down it; nothing sets its own size. */
+  --t-display: clamp(40px, 5.4vw, 62px);
+  --t-h1: clamp(32px, 4vw, 44px);
+  --t-h2: clamp(26px, 3vw, 34px);
+  --t-h3: 21px;
+
+  /*
+   * The arch. A dental arch, a mirror, a chair-back — the one shape the
+   * subject actually owns, and the frame every image on the site sits in
+   * so that a placeholder and a photograph read as the same object.
+   */
+  --arch: 999px 999px 22px 22px;
+}
+
+/*
+ * Dark, for the viewer whose system says so and who has not chosen
+ * otherwise. Written as a plain media query wrapping the guarded
+ * selector, not as a nested one inside it — CSS nesting is well
+ * supported now and this file has no build step to fall back on.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Soft slate-teal, not a lights-off room. The old ground was
+       #101820 — one step off black — and with a bright accent on it the
+       page was all contrast and no calm. */
+    --ground: #1d3039;
+    --surface: #26424d;
+    --sunken: #172730;
+    --porcelain: #2a2620;
+
+    --ink: #e9f5f8;
+    --ink-2: #b2ccd4;
+    --ink-3: #93b0ba;
+
+    --line: #3a5b67;
+    --line-soft: #2f4c57;
+
+    --accent: #2f98e3;
+    --accent-deep: #91c9f0;
+    --accent-wash: #162c3b;
+    --accent-ink: #6fb8eb;
+    --accent-on: #0e212f;
+
+    --warn: #e8b04b;
+    --warn-wash: #2a2210;
+    --stop: #f08a7e;
+    --stop-wash: #2e1614;
+    --go: #6fc79f;
+    --go-wash: #12261e;
+
+    --lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -16px rgba(0, 0, 0, 0.8);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #1d3039;
+  --surface: #26424d;
+  --sunken: #172730;
+  --porcelain: #2a2620;
+  --ink: #e9f5f8;
+  --ink-2: #b2ccd4;
+  --ink-3: #93b0ba;
+  --line: #3a5b67;
+  --line-soft: #2f4c57;
+  --accent: #2f98e3;
+  --accent-deep: #91c9f0;
+  --accent-wash: #162c3b;
+  --accent-ink: #6fb8eb;
+  /*
+   * The label on a filled button, and the one token this block used to
+   * leave out.
+   *
+   * Every other dark value was declared twice — once behind the media
+   * query for people following their OS, once here for people who picked
+   * dark from the toggle. This one was only in the media query, so an
+   * explicit choice of dark got the light ink: white, from `:root`, on a
+   * pale blue fill. At rest that is 3.12:1 and looks merely weak; on
+   * hover the fill lifts to `--accent-deep` and it becomes 1.78:1, which
+   * is why the text disappeared rather than dimmed, and why it only
+   * happened to some people. A token missing from one of the two dark
+   * blocks does not fail loudly — it silently inherits the other theme's
+   * value.
+   */
+  --accent-on: #0e212f;
+  --warn: #e8b04b;
+  --warn-wash: #2a2210;
+  --stop: #f08a7e;
+  --stop-wash: #2e1614;
+  --go: #6fc79f;
+  --go-wash: #12261e;
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -16px rgba(0, 0, 0, 0.8);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 16px/1.6 "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3 {
+  font-family: Spectral, ui-serif, Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  margin: 0;
+  text-wrap: balance;
+  letter-spacing: -0.005em;
+}
+
+a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--accent-deep); }
+
+/* Focus is never removed, only restyled. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/*
+ * Read but not seen.
+ *
+ * For text that belongs in the accessible name and would be noise on
+ * screen — a separator between two elements a sighted reader sees a gap
+ * between. `display: none` would remove it from the accessibility tree
+ * too, which is the mistake this class exists to avoid.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- skip link ---------- */
+
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 50;
+  padding: 12px 18px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: top 120ms ease;
+}
+.skip:focus { top: 12px; }
+
+/* ---------- layout ---------- */
+
+.shell { max-width: var(--container); margin: 0 auto; padding: 40px var(--gutter) 96px; }
+.shell--narrow { max-width: 520px; padding-top: 56px; }
+
+/* The website's container. Header, every band and the footer use it. */
+.wrap { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
+.wrap--read { max-width: calc(var(--measure) + 2 * var(--gutter)); }
+.wrap--page { padding-block: var(--s7) var(--section); }
+
+.stack { display: flex; flex-direction: column; gap: 18px; }
+.stack--tight { gap: 10px; }
+.stack--loose { gap: 40px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.row--split { justify-content: space-between; align-items: baseline; }
+
+/* ---------- masthead ---------- */
+
+.masthead { background: var(--surface); border-bottom: 1px solid var(--line); }
+.masthead__inner {
+  max-width: var(--container); margin: 0 auto; padding: 12px var(--gutter);
+  display: flex; flex-wrap: wrap; gap: 10px 20px;
+  align-items: center; justify-content: space-between;
+}
+.wordmark {
+  font-family: Spectral, ui-serif, Georgia, serif;
+  font-size: 18px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--ink); text-decoration: none;
+  display: flex; align-items: center; gap: 10px;
+}
+/* Fixed box, so a practice uploading a wide letterhead or a tall crest
+   gets the same masthead height either way. `contain` rather than `cover`
+   because a cropped logo is worse than a small one. */
+.wordmark__logo {
+  flex: 0 0 auto; width: 28px; height: 28px;
+  object-fit: contain; border-radius: 5px;
+}
+.wordmark small {
+  display: block;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+.nav { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
+.nav a, .nav button {
+  font: inherit; font-size: 15px;
+  color: var(--ink-2); text-decoration: none;
+  /* 44px minimum target. */
+  min-height: 44px; display: inline-flex; align-items: center;
+  padding: 0 14px; border-radius: var(--radius);
+  border: 0; background: none; cursor: pointer;
+}
+.nav a:hover, .nav button:hover { background: var(--sunken); color: var(--ink); }
+.nav a[aria-current="page"] {
+  color: var(--accent-ink); background: var(--accent-wash); font-weight: 600;
+}
+
+/* ---------- type ---------- */
+
+.h1 { font-size: clamp(29px, 4.5vw, 40px); line-height: 1.15; }
+.h2 { font-size: 22px; }
+.h3 { font-size: 17px; font-family: "IBM Plex Sans", sans-serif; font-weight: 600; }
+.lede { color: var(--ink-2); margin: 10px 0 0; max-width: var(--measure); font-size: 17px; }
+.eyebrow {
+  margin: 0 0 6px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+.muted { color: var(--ink-2); }
+.small { font-size: 14px; }
+.hint { font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+
+/* ---------- surfaces ---------- */
+
+/* The one thing on the page that lifts. */
+.feature {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--lift);
+  padding: 26px;
+}
+/* Warm, and reserved for the patient's own record. */
+.feature--own { background: var(--porcelain); border-color: transparent; }
+
+/* Everything else is separated by a rule, not boxed. */
+.panel { border-top: 1px solid var(--line); padding-top: 26px; }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list > li { padding: 16px 0; border-top: 1px solid var(--line-soft); }
+.list > li:first-child { border-top: 0; }
+
+.entry { display: flex; gap: 20px; align-items: baseline; flex-wrap: wrap; }
+.entry__when { flex: 0 0 120px; font-weight: 600; }
+.entry__what { flex: 1 1 240px; min-width: 0; }
+.entry__aside { flex: 0 0 auto; display: flex; gap: 8px; align-items: center; }
+
+/* ---------- forms ---------- */
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label { font-size: 14px; font-weight: 600; color: var(--ink); }
+
+/*
+ * The required marker.
+ *
+ * Both forms carried `required` in the HTML and showed nothing, so the
+ * only way to find out a field was needed was to submit without it. The
+ * asterisk is `aria-hidden` because the input already carries `required`,
+ * and a screen reader announcing "asterisk" after every label is noise on
+ * top of information it already has.
+ */
+.req { color: var(--stop); margin-left: 2px; font-weight: 700; }
+
+input, select, textarea {
+  font: inherit;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+}
+textarea { min-height: 88px; resize: vertical; }
+input::placeholder, textarea::placeholder { color: var(--ink-3); }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] {
+  border-color: var(--stop);
+  border-width: 2px;
+}
+
+.field__error {
+  font-size: 14px;
+  color: var(--stop);
+  font-weight: 500;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.field__error::before { content: "▲"; font-size: 10px; line-height: 1.7; }
+
+/*
+ * The password pair.
+ *
+ * Grid, with the hint on its own row spanning both columns. As two flex
+ * children the hint under "Password" pushed that field's box up and the
+ * two inputs stopped lining up — the thing Ahmad spotted. Fixing it with
+ * a margin on the other one would have worked until the text wrapped.
+ */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px 16px;
+  align-items: start;
+}
+.pair > .field { min-width: 0; }
+.pair__note { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--ink-2); }
+
+.secret { position: relative; display: flex; }
+.secret input { padding-right: 76px; }
+.secret button {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  min-height: 36px; padding: 0 10px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--accent-ink); background: none;
+  border: 0; border-radius: var(--radius-sm); cursor: pointer;
+}
+.secret button:hover { background: var(--accent-wash); }
+
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; }
+.check input { width: 22px; height: 22px; min-height: 0; flex: 0 0 auto; margin-top: 2px; accent-color: var(--accent); }
+.check label { font-weight: 500; }
+.check .hint { margin-top: 2px; }
+
+/* ---------- buttons ---------- */
+
+.btn {
+  font: inherit; font-size: 16px; font-weight: 600;
+  min-height: 46px;
+  padding: 0 22px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+/*
+ * Buttons restate their colour on hover, because most of them are links.
+ *
+ * `a:hover` further up sets `color: var(--accent-deep)`, which is right
+ * for a link in a sentence and catastrophic for `<a class="btn
+ * btn--primary">`: the rule that lifts the fill to `--accent-deep` left
+ * the label to the link rule, which set it to `--accent-deep` too. Text
+ * and background became the identical colour — 1.00:1, the label simply
+ * gone. It happened in every theme, which is why it read as intermittent
+ * rather than broken.
+ *
+ * The class selectors already outrank `a:hover`; they just had nothing to
+ * say about colour. Saying it is the whole fix.
+ */
+.btn:hover { border-color: var(--ink-3); color: var(--ink); }
+.btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.btn--primary:hover {
+  background: var(--accent-deep); border-color: var(--accent-deep);
+  color: var(--accent-on);
+}
+.btn--quiet { background: none; border-color: transparent; color: var(--ink-2); }
+.btn--quiet:hover { background: var(--sunken); border-color: transparent; color: var(--ink); }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- messages ---------- */
+
+.notice {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border-left: 4px solid;
+  font-size: 15px;
+}
+.notice--bad { background: var(--stop-wash); border-color: var(--stop); color: var(--stop); }
+.notice--good { background: var(--go-wash); border-color: var(--go); color: var(--go); }
+.notice--warn { background: var(--warn-wash); border-color: var(--warn); color: var(--warn); }
+
+/*
+ * The error summary at the top of a form.
+ *
+ * Linked, so the list is a way to get to the field and not just an
+ * announcement. Focus moves here on a failed submit, which is what makes
+ * it work with a screen reader — an `aria-live` region alone is announced
+ * and then gone.
+ */
+.summary {
+  background: var(--stop-wash);
+  border-left: 4px solid var(--stop);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.summary h2 { font-size: 16px; color: var(--stop); font-family: "IBM Plex Sans", sans-serif; font-weight: 600; }
+.summary ul { margin: 8px 0 0; padding-left: 20px; }
+.summary li { margin-top: 4px; }
+.summary a { color: var(--stop); }
+
+.pill {
+  display: inline-block;
+  font-size: 13px; font-weight: 600;
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.pill--good { background: var(--go-wash); border-color: transparent; color: var(--go); }
+.pill--warn { background: var(--warn-wash); border-color: transparent; color: var(--warn); }
+.pill--stop { background: var(--stop-wash); border-color: transparent; color: var(--stop); }
+
+.empty {
+  padding: 32px 22px;
+  text-align: center;
+  color: var(--ink-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+/* ---------- the slot picker ---------- */
+
+.days { display: flex; flex-direction: column; gap: 28px; }
+.day__head {
+  display: flex; gap: 12px; align-items: baseline;
+  padding-bottom: 8px; margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.day__date { font-family: Spectral, ui-serif, serif; font-size: 18px; font-weight: 600; }
+
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; }
+
+.slots { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.slot {
+  position: relative;
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: 52px; min-width: 104px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  line-height: 1.3;
+}
+.slot:hover { border-color: var(--accent); background: var(--accent-wash); }
+.slot input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer;
+}
+.slot__time { font-weight: 600; }
+.slot__who { font-size: 12px; color: var(--ink-2); }
+/* The label reacts to its own radio, so keyboard selection styles too —
+   a `picked` class driven by a click handler would not. */
+.slot:has(input:checked) {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-on);
+}
+/* `color-mix` so the secondary line stays readable whichever way
+   `--accent-on` resolved — a fixed white at 85% is invisible when the
+   practice's colour needed dark text. */
+.slot:has(input:checked) .slot__who {
+  color: color-mix(in srgb, var(--accent-on) 78%, transparent);
+}
+.slot:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- tables ---------- */
+
+.scroll-x { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.table th {
+  text-align: left; padding: 0 14px 10px 0;
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600;
+}
+.table td { padding: 12px 14px 12px 0; border-top: 1px solid var(--line-soft); }
+.table td.num { text-align: right; padding-right: 0; }
+
+@media (max-width: 540px) {
+  .entry__when { flex-basis: 100%; }
+  .shell { padding-top: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ==================================================================
+ * The practice's public website.
+ *
+ * The same two typefaces as the patient area, on purpose: a patient who
+ * signs in should not feel they have left the practice's website. What
+ * changes is the room the type sits in — a wider container, a real type
+ * ladder, and the practice's own colour spent in four deliberate places:
+ * the line above the header, the hero panel, the fact strip beneath it
+ * and the footer. Everywhere else it is a link colour and nothing more.
+ *
+ * Built after reading how the practices patients actually choose lay
+ * their pages out — phone and Book in a sticky header, a headline that
+ * says what the practice *is* rather than what it is called, treatments
+ * as a grid of pictures, the people with faces, and the address with
+ * the week's hours as a band near the foot. This follows that order
+ * because it is the order a person in pain reads a page in, not because
+ * it is fashionable.
+ *
+ * Hierarchy is still spent, not sprinkled: the hero panel is the one
+ * surface that lifts. Cards have a hairline and no shadow.
+ * ================================================================== */
+
+.site { display: flex; flex-direction: column; min-height: 100vh; font-size: 17px; }
+.site > main { flex: 1 0 auto; }
+
+/* ---------- the header ---------- */
+
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+/* The practice's colour, as the first four pixels of the page. Enough to
+   brand it, too little to fight the words under it. */
+.topbar::before { content: ""; display: block; height: 4px; background: var(--accent); }
+.topbar__inner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s3) var(--s6);
+  min-height: 74px; padding-block: var(--s2);
+}
+
+.mark {
+  text-decoration: none; color: var(--ink);
+  display: flex; align-items: center; gap: var(--s3);
+  flex: 0 0 auto;
+}
+/* `contain`, not `cover`: a cropped logo is worse than a small one. */
+.mark__logo { flex: 0 0 auto; width: 44px; height: 44px; object-fit: contain; border-radius: 10px; }
+.mark__name {
+  display: block;
+  font-family: Spectral, ui-serif, Georgia, serif;
+  font-size: 21px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.1;
+}
+.mark__place {
+  display: block; margin-top: 2px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+.sitenav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); }
+.sitenav a {
+  font-size: 15px; color: var(--ink-2); text-decoration: none;
+  min-height: 44px; display: inline-flex; align-items: center;
+  padding: 0 var(--s3); border-radius: var(--radius);
+}
+.sitenav a:hover { background: var(--sunken); color: var(--ink); }
+.sitenav a[aria-current="page"] {
+  color: var(--accent-ink); font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent); border-radius: 0;
+}
+
+/* Phone and Book, together at the end — the two things the references
+   never make a visitor look for. */
+.topbar__reach { display: flex; align-items: center; gap: var(--s2); flex: 0 0 auto; }
+.topbar__tel {
+  color: var(--ink); text-decoration: none; font-weight: 600;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  min-height: 44px; display: inline-flex; align-items: center;
+  padding: 0 var(--s3); border-radius: var(--radius);
+}
+.topbar__tel:hover { background: var(--sunken); }
+.btn--sm { min-height: 42px; padding: 0 var(--s4); font-size: 15px; }
+
+/* ---------- the hero ---------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: var(--s7) var(--s8);
+  align-items: center;
+  padding-block: clamp(40px, 6vw, 72px) var(--s7);
+}
+.hero__say { min-width: 0; }
+.eyebrow {
+  margin: 0 0 var(--s3);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+/*
+ * The headline is what the practice says, not what it is called. Every
+ * good practice site opens with a sentence — the name is already in the
+ * masthead, the tab and the footer, and a page that shouts it a fourth
+ * time in 62px has used its largest type to say nothing.
+ */
+.hero__title, .display {
+  font-family: Spectral, ui-serif, Georgia, serif;
+  font-weight: 500;
+  font-size: var(--t-display);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  margin: 0;
+  max-width: 15ch;
+  text-wrap: balance;
+}
+.hero__lede {
+  margin: var(--s4) 0 0;
+  font-size: 19px; line-height: 1.55; color: var(--ink-2);
+  max-width: 44ch;
+}
+.hero .status { margin: var(--s5) 0 0; }
+.hero__actions { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s5); }
+.hero__actions .btn { min-height: 50px; padding: 0 var(--s5); font-size: 16px; }
+
+/*
+ * The panel. The one thing on the front page that lifts, and the arch
+ * is doing the work a photograph frame does in every practice's waiting
+ * room: it says "this is a picture of us" whether or not there is a
+ * picture yet. Empty, it is the practice's colour washed pale, and the
+ * page still looks finished.
+ */
+.hero__panel {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  max-height: 580px;
+  border-radius: var(--arch);
+  overflow: hidden;
+  background: var(--accent-wash);
+  box-shadow: var(--lift);
+  justify-self: end;
+  width: 100%;
+  max-width: 480px;
+}
+.hero__panel img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hero__panel--empty::after {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 90% at 30% 20%, transparent 0 40%, color-mix(in srgb, var(--accent) 22%, transparent) 100%);
+}
+
+/* ---------- the fact strip ---------- */
+/*
+ * Three facts a practice genuinely has, straight after the hero: today's
+ * hours, the telephone, the address. Not "award-winning", not "gentle" —
+ * the strip is for what a person in a hurry checks before ringing.
+ */
+.facts { background: var(--accent-wash); border-block: 1px solid var(--line-soft); }
+.facts__inner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--s4) var(--s6);
+  padding-block: var(--s5);
+}
+.fact { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fact__label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.fact__value { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.fact__value a { color: inherit; text-decoration-color: var(--accent); }
+.fact__value small { display: block; font-weight: 400; color: var(--ink-2); font-size: 14px; }
+
+/*
+ * Open or closed, and never in the practice's colour: a practice whose
+ * colour happens to be green must not look permanently open.
+ */
+.status { display: flex; gap: 10px; align-items: baseline; margin: 0; font-size: 16px; color: var(--ink-2); }
+.status strong { color: var(--ink); }
+.status__dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; transform: translateY(-1px); }
+.status--open .status__dot { background: var(--go); box-shadow: 0 0 0 3px var(--go-wash); }
+.status--shut .status__dot { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-wash); }
+
+/* ---------- sections ---------- */
+
+.band { padding-block: var(--section) 0; }
+.band--flush { padding-block: var(--s7) 0; }
+.band__head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: var(--s2) var(--s5);
+  margin-bottom: var(--s5);
+}
+.band__head a { font-size: 15px; font-weight: 600; }
+.h2 { font-size: var(--t-h2); line-height: 1.15; letter-spacing: -0.015em; }
+.h3 { font-size: var(--t-h3); line-height: 1.3; }
+.pagehead { margin-bottom: var(--s6); }
+.pagehead .h1, .h1 { font-size: var(--t-h1); line-height: 1.1; letter-spacing: -0.02em; }
+.lede { font-size: 19px; line-height: 1.55; color: var(--ink-2); max-width: 52ch; margin: var(--s3) 0 0; }
+
+.prose { max-width: var(--measure); }
+.prose p { margin: 0 0 var(--s4); color: var(--ink-2); font-size: 17px; }
+.prose h2 { font-size: 24px; margin: var(--s6) 0 var(--s2); }
+.prose h3 { font-size: 19px; margin: var(--s5) 0 var(--s2); }
+.prose ul, .prose ol { margin: 0 0 var(--s4); padding-left: 22px; color: var(--ink-2); }
+.prose li { margin-bottom: var(--s2); }
+.prose--legal { max-width: 68ch; }
+.prose--legal h2 { font-size: 20px; margin: 36px 0 10px; }
+.prose--legal ul { margin: 0 0 16px; padding-left: 22px; color: var(--ink-2); }
+.prose--legal li { margin-bottom: 10px; }
+.prose--legal hr { border: 0; border-top: 1px solid var(--line); margin: 36px 0 20px; }
+
+.intro { padding-block: var(--section) 0; }
+.intro p {
+  font-size: clamp(20px, 2.1vw, 26px); line-height: 1.45; color: var(--ink);
+  max-width: 44ch; margin: 0;
+  font-family: Spectral, ui-serif, Georgia, serif; font-weight: 500; text-wrap: balance;
+}
+.intro p + p { margin-top: var(--s4); }
+
+/* ---------- treatments: a grid of pictures ---------- */
+
+.list-plain { list-style: none; margin: 0; padding: 0; }
+.cards {
+  list-style: none; margin: 0; padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--s5);
+}
+.card {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 120ms ease;
+}
+.card:hover { border-color: var(--accent); }
+/*
+ * `height: auto` is load-bearing. The markup gives every image width and
+ * height attributes so the layout does not jump while it loads, and a
+ * height attribute is an author-level `height` property — it beats
+ * `aspect-ratio`, and without this line every landscape picture was
+ * cropped by `object-fit` into a 350×600 portrait. The hero never had
+ * the bug only because its rule happens to set `height: 100%`.
+ */
+.card__image {
+  display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover;
+  background: var(--accent-wash);
+}
+.card__body { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s4) var(--s5) var(--s5); flex: 1; }
+.card__name { font-family: Spectral, ui-serif, Georgia, serif; font-size: var(--t-h3); font-weight: 600; margin: 0; }
+.card__name a { color: var(--ink); text-decoration: none; }
+/* The whole card is the link, through the heading's pseudo-element, so
+   the accessible name stays the treatment's name and not "learn more". */
+.card__name a::after { content: ""; position: absolute; inset: 0; }
+.card__name a:focus-visible { outline: none; }
+.card:has(.card__name a:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.card__summary { margin: 0; color: var(--ink-2); font-size: 15px; flex: 1; }
+.card__price {
+  margin: var(--s2) 0 0; display: flex; gap: var(--s2); align-items: baseline;
+  font-size: 19px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.card__from, .card__quoted {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.card__quoted { font-weight: 500; letter-spacing: 0.04em; font-size: 13px; text-transform: none; }
+
+/* The single-treatment page still prices in a tag. */
+.pricetag { margin: 18px 0 0; font-size: 26px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pricetag__from { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.pricetag--none { font-size: 15px; color: var(--ink-2); max-width: 48ch; }
+.crumbs { font-size: 14px; color: var(--ink-3); margin-bottom: var(--s3); }
+
+.cta {
+  margin-top: var(--s7);
+  padding: var(--s5) var(--s6);
+  background: var(--accent-wash);
+  border-radius: var(--radius-lg);
+}
+.cta h2 { margin-bottom: 6px; }
+.cta .row { margin-top: var(--s4); }
+.cta .small { max-width: 56ch; }
+
+.chips { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s4) 0 0; padding: 0; }
+.chip {
+  display: inline-flex; align-items: center; min-height: 38px;
+  padding: 0 14px; border: 1px solid var(--line); border-radius: 999px;
+  font-size: 14px; color: var(--ink-2); text-decoration: none; background: var(--surface);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+/* ---------- people ---------- */
+
+.people { list-style: none; margin: 0; padding: 0; }
+/*
+ * A fixed first column, not `auto`. `auto` sized itself to whatever was
+ * in it, and with no portrait that was the name — so each row's bio
+ * started wherever that row's name ended. Repeated things are one
+ * object: the face column is 128px whether it holds a photograph or an
+ * empty frame, and the text column starts in the same place every time.
+ */
+.person {
+  padding: var(--s5) 0; border-top: 1px solid var(--line-soft);
+  display: grid; grid-template-columns: 128px 1fr; grid-template-rows: auto 1fr;
+  gap: var(--s2) var(--s6); align-items: start;
+}
+.person:first-child { border-top: 0; }
+.person__face {
+  grid-column: 1; grid-row: 1 / 3;
+  width: 128px; height: 128px; border-radius: 50%; object-fit: cover;
+  background: var(--accent-wash); box-shadow: 0 0 0 1px var(--line-soft);
+}
+.person__head { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.person__bio { grid-column: 2; }
+.person__name { font-family: Spectral, ui-serif, Georgia, serif; font-size: 20px; font-weight: 600; margin: 0; }
+.person__role { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+.person__bio { margin: 0; color: var(--ink-2); max-width: 62ch; }
+
+.people--brief {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--s6) var(--s5);
+}
+.people--brief li { min-width: 0; }
+.people__face {
+  display: block; width: 136px; height: 136px; object-fit: cover; border-radius: 50%;
+  margin: 0 0 var(--s4); background: var(--accent-wash);
+  box-shadow: 0 0 0 1px var(--line-soft);
+}
+.people__name { margin: 0; font-family: Spectral, ui-serif, Georgia, serif; font-size: 20px; font-weight: 600; }
+.people__role { margin: 4px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ---------- questions ---------- */
+
+.qa { margin-top: 0; border-top: 1px solid var(--line); }
+.qa__item { border-bottom: 1px solid var(--line-soft); }
+.qa__item summary {
+  cursor: pointer; list-style: none;
+  padding: var(--s4) 40px var(--s4) 0; position: relative;
+  font-weight: 600; color: var(--ink); font-size: 17px;
+}
+.qa__item summary::-webkit-details-marker { display: none; }
+.qa__item summary::after {
+  content: "+";
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font-size: 22px; font-weight: 400; color: var(--accent-ink); line-height: 1;
+}
+.qa__item[open] summary::after { content: "−"; }
+.qa__item p { margin: 0 0 var(--s5); color: var(--ink-2); max-width: 62ch; }
+
+/* ---------- find us: a band, near the foot, as the references do ---------- */
+
+.findus { background: var(--sunken); margin-top: var(--section); }
+.findus__inner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: var(--s6) var(--s8);
+  padding-block: var(--section);
+  align-items: start;
+}
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: var(--s6) var(--s8);
+  align-items: start;
+}
+.two .hours, .findus .hours { max-width: 360px; }
+.address { font-style: normal; margin: var(--s2) 0 var(--s5); color: var(--ink); font-size: 19px; line-height: 1.6; font-family: Spectral, ui-serif, Georgia, serif; }
+.reach { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: var(--s2) var(--s5); font-size: 16px; }
+.reach dt { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding-top: 4px; }
+.reach dd { margin: 0; color: var(--ink-2); }
+
+.hours { width: 100%; border-collapse: collapse; font-size: 16px; }
+.hours__caption {
+  caption-side: top; text-align: left;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-3);
+  padding-bottom: var(--s3);
+}
+.hours th { text-align: left; font-weight: 400; color: var(--ink-2); padding: 9px 0; white-space: nowrap; }
+.hours td { text-align: right; padding: 9px 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hours tr + tr th, .hours tr + tr td { border-top: 1px solid var(--line); }
+.hours .is-today th, .hours .is-today td { font-weight: 600; color: var(--ink); }
+.hours__today { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-ink); margin-left: 6px; }
+.hours__shut { color: var(--ink-3); }
+.hours__ring { margin: var(--s4) 0 0; font-size: 15px; color: var(--ink-2); }
+
+.table--ruled { margin-top: 18px; }
+.table--ruled th[scope="col"] { white-space: nowrap; }
+.table--ruled th[scope="row"] { font-size: inherit; text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 600; padding: 12px 14px 12px 0; border-top: 1px solid var(--line-soft); }
+.nowrap { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------- the footer: three columns, the practice's colour underneath ---------- */
+
+.footer { margin-top: var(--section); background: var(--accent-wash); border-top: 4px solid var(--accent); }
+.footer__inner {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: var(--s6) var(--s8);
+  padding-block: var(--s7) var(--s6);
+  align-items: start;
+}
+.footer__name { margin: 0 0 var(--s2); font-family: Spectral, ui-serif, serif; font-size: 20px; font-weight: 600; }
+.footer__address { font-style: normal; color: var(--ink-2); font-size: 15px; line-height: 1.6; margin: 0 0 var(--s3); }
+.footer__tel { color: var(--ink); font-weight: 600; text-decoration: none; }
+.footer__tel:hover { text-decoration: underline; }
+.footer__col h2 { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--s3); font-family: "IBM Plex Sans", sans-serif; }
+.footer__links { display: flex; flex-direction: column; gap: var(--s2); font-size: 15px; }
+.footer__links a { color: var(--ink-2); text-decoration: none; }
+.footer__links a:hover { color: var(--accent-ink); text-decoration: underline; }
+.footer__fine { grid-column: 1 / -1; margin: var(--s4) 0 0; padding-top: var(--s4); border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); max-width: 60ch; }
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; gap: var(--s6); padding-block: var(--s6) var(--s6); }
+  .hero__panel { justify-self: stretch; max-width: none; aspect-ratio: 16 / 10; max-height: 340px; }
+  .hero__title { max-width: none; }
+  .footer__inner { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+  .topbar__inner { flex-wrap: wrap; }
+  .topbar__reach { width: 100%; justify-content: space-between; }
+  .sitenav { order: 3; width: 100%; }
+  .mark__logo { width: 38px; height: 38px; }
+  .mark__name { font-size: 19px; }
+}
+@media (max-width: 560px) {
+  .footer__inner { grid-template-columns: 1fr; }
+  .person { grid-template-columns: 1fr; }
+  .person__face { grid-row: auto; width: 96px; height: 96px; }
+  .person__head, .person__bio { grid-column: 1; }
+  .hero__actions .btn { width: 100%; justify-content: center; }
+}
+
+/* Somebody who asked for less motion has not asked for less design:
+   the only transition here is a border colour, and it goes too. */
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}
+
+/* ==================================================================
+ * The practice's own colour, mapped onto the palette — twice.
+ *
+ * `themeFor()` writes a set of `--brand-*` properties inline on a
+ * wrapper. This is where they become the palette, and it happens once
+ * per scheme because a colour that is readable on a white page is not
+ * readable on a black one. Kadehuis's teal is darkened until it passes
+ * on paper and lifted until it passes on ink; the wrapper carries both
+ * and the cascade picks.
+ *
+ * The absence of a fallback in each `var()` is deliberate and is the
+ * mechanism, not an oversight. A `var()` with no fallback pointing at a
+ * property nobody set is invalid at computed-value time, and a custom
+ * property that is invalid at computed-value time **inherits** — so a
+ * practice with no colour set silently gets `:root`'s own accent. The
+ * alternative, `var(--brand, var(--accent))`, is a cycle: a custom
+ * property that references itself, even from a fallback, is thrown away
+ * along with everything that depends on it.
+ * ================================================================== */
+
+.themed {
+  --accent: var(--brand);
+  --accent-deep: var(--brand-deep);
+  --accent-on: var(--brand-on);
+  --accent-ink: var(--brand-ink-light);
+  --accent-wash: var(--brand-wash-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .themed {
+    --accent: var(--brand-lift);
+    --accent-deep: var(--brand-lift-deep);
+    --accent-on: var(--brand-lift-on);
+    --accent-ink: var(--brand-ink-dark);
+    --accent-wash: var(--brand-wash-dark);
+  }
+}
+
+:root[data-theme="dark"] .themed {
+  --accent: var(--brand-lift);
+  --accent-deep: var(--brand-lift-deep);
+  --accent-on: var(--brand-lift-on);
+  --accent-ink: var(--brand-ink-dark);
+  --accent-wash: var(--brand-wash-dark);
+}

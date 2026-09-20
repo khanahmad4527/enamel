@@ -1,0 +1,66 @@
+{
+  "name": "directus-extension-day-sheet",
+  "version": "1.0.0",
+  "description": "The diary as a practice works it: chairs across the top, time down the side, drag to reschedule.",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Ahmad Khan <ahmad@khanahmad.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanahmad4527/enamel.git",
+    "directory": "extensions/directus-extension-day-sheet"
+  },
+  "homepage": "https://github.com/khanahmad4527/enamel#the-day-sheet",
+  "keywords": [
+    "directus",
+    "directus-extension",
+    "directus-custom-bundle",
+    "dental",
+    "scheduling"
+  ],
+  "type": "module",
+  "icon": "calendar_view_day",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "directus:extension": {
+    "type": "bundle",
+    "path": {
+      "app": "dist/app.js",
+      "api": "dist/api.js"
+    },
+    "entries": [
+      {
+        "type": "module",
+        "name": "day-sheet",
+        "source": "src/module/index.ts"
+      },
+      {
+        "type": "endpoint",
+        "name": "day-sheet-api",
+        "source": "src/endpoint/index.ts"
+      }
+    ],
+    "host": "^11.0.0 || ^12.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "13.1.1",
+    "@enamel/extension-ui": "workspace:*",
+    "@enamel/time": "workspace:*",
+    "@types/node": "22.20.2",
+    "typescript": "5.9.3",
+    "vue": "3.5.42",
+    "vue-tsc": "2.2.12"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

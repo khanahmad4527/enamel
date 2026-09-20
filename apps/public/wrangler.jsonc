@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "enamel-public",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./workers/app.ts",
+  "assets": { "directory": "./dist/client" },
+  "observability": { "enabled": true },
+  // Local values only. A deployment sets these with `wrangler secret put`
+  // — PORTAL_SESSION_SECRET in particular signs the cookie that carries a
+  // patient's access token, and a committed one would sign everybody's.
+  "vars": {
+    "DIRECTUS_URL": "http://localhost:8056",
+    "CORE_URL": "http://localhost:8057"
+  }
+}

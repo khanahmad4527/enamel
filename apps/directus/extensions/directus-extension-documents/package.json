@@ -1,0 +1,67 @@
+{
+  "name": "directus-extension-documents",
+  "version": "1.0.0",
+  "description": "Patient documents: a radiograph viewer that adjusts without altering, and the rules that keep a version chain honest.",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Ahmad Khan <ahmad@khanahmad.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanahmad4527/enamel.git",
+    "directory": "apps/directus/extensions/directus-extension-documents"
+  },
+  "homepage": "https://github.com/khanahmad4527/enamel#documents-and-imaging",
+  "keywords": [
+    "directus",
+    "directus-extension",
+    "directus-custom-bundle",
+    "dental",
+    "imaging",
+    "radiograph"
+  ],
+  "type": "module",
+  "icon": "imagesearch_roller",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "directus:extension": {
+    "type": "bundle",
+    "path": {
+      "app": "dist/app.js",
+      "api": "dist/api.js"
+    },
+    "entries": [
+      {
+        "type": "interface",
+        "name": "radiograph-viewer",
+        "source": "src/interface/index.ts"
+      },
+      {
+        "type": "hook",
+        "name": "document-rules",
+        "source": "src/hook/index.ts"
+      }
+    ],
+    "host": "^11.0.0 || ^12.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "devDependencies": {
+    "@directus/errors": "2.5.1",
+    "@directus/extensions-sdk": "13.1.1",
+    "@enamel/extension-ui": "workspace:*",
+    "@types/node": "22.20.2",
+    "typescript": "5.9.3",
+    "vue": "3.5.42",
+    "vue-tsc": "2.2.12"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

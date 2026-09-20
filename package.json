@@ -1,0 +1,48 @@
+{
+  "name": "enamel",
+  "private": true,
+  "description": "A dental practice backend on Directus: the diary, the clinical record, the patient site, and a permission model with checks behind it.",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Ahmad Khan <ahmad@khanahmad.com>",
+  "homepage": "https://github.com/khanahmad4527/enamel#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanahmad4527/enamel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/khanahmad4527/enamel/issues"
+  },
+  "keywords": [
+    "directus",
+    "dental",
+    "practice-management",
+    "healthcare",
+    "gdpr",
+    "bullmq",
+    "nestjs",
+    "react-router",
+    "postgres"
+  ],
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f directus",
+    "logs:core": "docker compose logs -f core",
+    "build:packages": "pnpm --filter @enamel/time build && pnpm --filter @enamel/extension-ui build",
+    "build:extensions": "./scripts/build-extensions.sh",
+    "provision": "pnpm --filter @enamel/bootstrap provision",
+    "seed": "pnpm --filter @enamel/bootstrap seed",
+    "verify": "pnpm --filter @enamel/bootstrap verify",
+    "typecheck": "pnpm -r typecheck",
+    "reset": "./scripts/teardown.sh && ./scripts/setup.sh",
+    "setup": "./scripts/setup.sh",
+    "teardown": "./scripts/teardown.sh",
+    "backup": "./scripts/backup.sh",
+    "restore": "./scripts/restore.sh",
+    "restore:test": "./scripts/restore-test.sh"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

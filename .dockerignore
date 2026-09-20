@@ -1,0 +1,19 @@
+# Build contexts are the repo root (apps/core and apps/public both depend
+# on the workspace), so this list is what never belongs in any image.
+node_modules
+**/node_modules
+**/dist
+**/build
+.git
+data
+uploads
+
+# The development secrets file. It is gitignored, so it would not reach a
+# clone — but it does reach a local `docker compose build`, and the
+# Cloudflare plugin copies it into the build output, where it would then
+# win over the value the container is actually given. A cookie-signing key
+# baked into an image is exactly the failure this file exists to prevent.
+**/.dev.vars
+**/.wrangler
+**/.react-router
+.env

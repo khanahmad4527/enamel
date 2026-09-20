@@ -1,0 +1,38 @@
+{
+  "name": "@enamel/public",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The patient-facing site: sign in, see your own record, book from real availability.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "scripts": {
+    "build": "react-router build",
+    "dev": "react-router dev --host 0.0.0.0 --port 8058",
+    "start": "vite preview --host 0.0.0.0 --port 8058",
+    "typecheck": "react-router typegen && tsc --noEmit",
+    "deploy": "react-router build && wrangler deploy -c dist/server/wrangler.json"
+  },
+  "dependencies": {
+    "isbot": "5.2.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "7.18.3",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260911.1",
+    "@react-router/dev": "7.18.3",
+    "@types/node": "22.20.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vite-tsconfig-paths": "5.1.4",
+    "wrangler": "4.131.1",
+    "@cloudflare/vite-plugin": "1.54.8"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
