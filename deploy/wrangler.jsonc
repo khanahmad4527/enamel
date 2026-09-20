@@ -11,10 +11,15 @@
   //
   //   cd deploy && npx wrangler deploy
   "name": "enamel",
-  // Keep the workers.dev URL alive as well as the custom domain. Without
-  // this, deploying turns it off — and if the custom domain's DNS record
-  // is not in place, that leaves nothing serving at all.
-  "workers_dev": true,
+  // One address, and it is the custom domain. The workers.dev URL is off
+  // so the site cannot be found at two names — which matters for a demo
+  // that search engines will index.
+  //
+  // Order matters if this is ever rebuilt from scratch: turning
+  // workers.dev off before the custom domain resolves leaves nothing
+  // serving at all, which is exactly what happened here once.
+  "workers_dev": false,
+  "preview_urls": false,
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "../dist-static",
@@ -25,12 +30,16 @@
   },
   // The apex is Ahmad's portfolio and is deliberately untouched.
   //
-  // Attaching this needed a DNS record in the khanahmad.com zone, and the
-  // OAuth token wrangler holds has `zone (read)` without DNS write — so
-  // the route bound and the record never appeared. Add the domain once
-  // from the dashboard (Workers & Pages -> enamel -> Domains & Routes)
-  // and Cloudflare writes the record itself; after that this line keeps
-  // it attached on every deploy.
+  // `wrangler deploy` binds this route but cannot create the DNS record:
+  // its OAuth token carries `zone:read` and no DNS write. The record was
+  // made once through the Workers custom-domain API, which creates it as
+  // a side effect of attaching the hostname and is covered by
+  // `workers_routes:write`:
+  //
+  //   PUT /accounts/<account>/workers/domains
+  //   { environment, hostname, service, zone_id }
+  //
+  // After that this line keeps the domain attached on every deploy.
   "routes": [
     { "pattern": "enamel.khanahmad.com", "custom_domain": true }
   ]
