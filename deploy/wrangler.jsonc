@@ -1,0 +1,37 @@
+{
+  // The public website, as flat files on Cloudflare.
+  //
+  // `pnpm site:static` crawls the running site into ../dist-static and
+  // this publishes that directory. There is no server here and no
+  // Directus: signing in, booking and registering all need a backend,
+  // so those links point at the repository instead.
+  //
+  // Run from this directory — wrangler refuses to guess a project at the
+  // root of a pnpm workspace.
+  //
+  //   cd deploy && npx wrangler deploy
+  "name": "enamel",
+  // Keep the workers.dev URL alive as well as the custom domain. Without
+  // this, deploying turns it off — and if the custom domain's DNS record
+  // is not in place, that leaves nothing serving at all.
+  "workers_dev": true,
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "../dist-static",
+    // Every page is written as <path>/index.html, so a request for
+    // /team is served /team/index.html without a redirect.
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  // The apex is Ahmad's portfolio and is deliberately untouched.
+  //
+  // Attaching this needed a DNS record in the khanahmad.com zone, and the
+  // OAuth token wrangler holds has `zone (read)` without DNS write — so
+  // the route bound and the record never appeared. Add the domain once
+  // from the dashboard (Workers & Pages -> enamel -> Domains & Routes)
+  // and Cloudflare writes the record itself; after that this line keeps
+  // it attached on every deploy.
+  "routes": [
+    { "pattern": "enamel.khanahmad.com", "custom_domain": true }
+  ]
+}

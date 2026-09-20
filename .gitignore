@@ -13,3 +13,7 @@ extensions/*/dist/
 # Encrypted database backups. Small, and still the most concentrated
 # copy of the practice that exists — never in the repository.
 backups/
+
+# The static export of the public site, rebuilt by `pnpm site:static`
+# from whatever Directus is serving at the time.
+dist-static/

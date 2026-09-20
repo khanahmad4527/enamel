@@ -33,6 +33,8 @@
     "provision": "pnpm --filter @enamel/bootstrap provision",
     "seed": "pnpm --filter @enamel/bootstrap seed",
     "verify": "pnpm --filter @enamel/bootstrap verify",
+    "site:static": "node tools/static-site.mjs dist-static",
+    "site:deploy": "pnpm site:static && npx wrangler pages deploy dist-static --project-name enamel --branch main",
     "typecheck": "pnpm -r typecheck",
     "reset": "./scripts/teardown.sh && ./scripts/setup.sh",
     "setup": "./scripts/setup.sh",
