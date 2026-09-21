@@ -959,7 +959,11 @@ legend { padding: 0; }
 .address { font-style: normal; margin: var(--s2) 0 var(--s5); color: var(--ink); font-size: 19px; line-height: 1.6; font-family: Spectral, ui-serif, Georgia, serif; }
 .reach { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: var(--s2) var(--s5); font-size: 16px; }
 .reach dt { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding-top: 4px; }
-.reach dd { margin: 0; color: var(--ink-2); }
+/* An email address is one unbreakable word. At 320px
+   "hello@kadehuis.example.com" was 12px wider than the screen and took
+   the whole page sideways with it — the only horizontal scroll on the
+   site, and on the width a first-generation SE still reports. */
+.reach dd { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
 
 .hours { width: 100%; border-collapse: collapse; font-size: 16px; }
 .hours__caption {
@@ -1003,6 +1007,48 @@ legend { padding: 0; }
 
 /* ---------- narrow screens ---------- */
 
+/*
+ * The nav is one line that scrolls sideways, never two that wrap.
+ *
+ * A wrapped nav is what made this bar tall, and it wrapped a long way
+ * up: measured across widths it was 79px at 1100 and above, and 113,
+ * 161 then 209px as the window narrowed — the worst of it on a tablet
+ * rather than a phone, which is the size nobody checks.
+ *
+ * 1080px is where the links stop fitting beside the telephone and Book,
+ * measured rather than chosen: they need 443px and the row has room for
+ * them at 1100 and not at 1060.
+ *
+ * `-webkit-overflow-scrolling` for momentum on iOS. The scrollbar is
+ * hidden because a visible one under four links reads as a rendering
+ * fault rather than an affordance.
+ */
+@media (max-width: 1080px) {
+  /*
+   * On its own row, because sharing one with the telephone and Book
+   * leaves it nothing. Measured: the links need 443px, and between 800
+   * and 1060 the nav was given between 177 and 429 — so it was a single
+   * line that scrolled, and what a reader saw was "Treatments  Who",
+   * truncated mid-label. A nav clipped in the middle of a word reads as
+   * broken, not as scrollable.
+   *
+   * Costs a second row and about 40px. Worth it against a masthead that
+   * looks like it failed to render.
+   */
+  .topbar__inner { flex-wrap: wrap; }
+  .sitenav {
+    order: 3; width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .sitenav::-webkit-scrollbar { display: none; }
+  /* The links are what scrolls, so they must not shrink to fit. */
+  .sitenav > * { flex: 0 0 auto; }
+}
+
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; gap: var(--s6); padding-block: var(--s6) var(--s6); }
   .hero__panel { justify-self: stretch; max-width: none; aspect-ratio: 16 / 10; max-height: 340px; }
@@ -1010,9 +1056,25 @@ legend { padding: 0; }
   .footer__inner { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 760px) {
+  /*
+   * The masthead stops following you down the page.
+   *
+   * Everything in it stacks at this width — the mark, then the telephone
+   * and Book, then the nav — and the nav wraps onto two lines of its own.
+   * Measured at 221px on a 740px phone: a sticky bar holding 30% of the
+   * screen for the whole scroll, so a third of every page was masthead.
+   * Sticky is worth it when it costs 74px and not when it costs 221.
+   *
+   * The `top` and `z-index` go with it. Left behind on a static element
+   * they do nothing, and the next person to read this would reasonably
+   * assume it still sticks.
+   */
+  .topbar { position: static; }
   .topbar__inner { flex-wrap: wrap; }
   .topbar__reach { width: 100%; justify-content: space-between; }
+
   .sitenav { order: 3; width: 100%; }
+
   .mark__logo { width: 38px; height: 38px; }
   .mark__name { font-size: 19px; }
 }
