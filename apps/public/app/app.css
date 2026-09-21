@@ -1080,6 +1080,38 @@ legend { padding: 0; }
 }
 @media (max-width: 560px) {
   .footer__inner { grid-template-columns: 1fr; }
+
+  /*
+   * The home page's team strip becomes a list, not three portraits.
+   *
+   * It is a grid of cards that collapses to one column here, and each
+   * card is a 136px circle with the name stacked under it — so three
+   * people took about 1,100px of scroll with the right-hand two thirds
+   * of every row empty. On the front page this is a glance at who works
+   * here, not a profile; the bios are on /team and stacking earns its
+   * height there.
+   *
+   * The face spans both rows explicitly because the markup is flat —
+   * image, name, role as siblings — so auto-placement would put the
+   * role underneath the picture instead of under the name.
+   */
+  .people--brief { gap: var(--s5); }
+  .people--brief li {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    column-gap: var(--s4);
+    align-items: center;
+  }
+  /* Both dimensions, because the markup carries width="136" height="136"
+     and an HTML size attribute is author-level CSS: setting only the
+     width here would leave a 72x136 oval. */
+  .people__face {
+    grid-column: 1; grid-row: 1 / span 2; align-self: center;
+    width: 72px; height: 72px; margin: 0;
+  }
+  .people__name { grid-column: 2; align-self: end; }
+  .people__role { grid-column: 2; align-self: start; margin-top: 2px; }
+
   .person { grid-template-columns: 1fr; }
   .person__face { grid-row: auto; width: 96px; height: 96px; }
   .person__head, .person__bio { grid-column: 1; }
