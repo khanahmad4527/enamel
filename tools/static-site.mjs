@@ -27,6 +27,17 @@ import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const SITE = process.env.SITE_URL ?? "http://localhost:8058";
+/*
+ * Where the export is served, which is not where it was crawled.
+ *
+ * The app writes its absolute URLs — the canonical, og:url, the sitemap,
+ * the Sitemap line in robots.txt, the JSON-LD — from the address it was
+ * asked on, which is right for a server and wrong for a crawl: the first
+ * export went live telling search engines that every page's real address
+ * was http://localhost:8058. They cannot use a canonical they cannot
+ * reach, so the pages were filed as duplicates with no canonical at all.
+ */
+const PUBLIC_URL = (process.env.PUBLIC_URL ?? "https://enamel.khanahmad.com").replace(/\/$/, "");
 const OUT = process.argv[2] ?? "dist-static";
 const REPO = process.env.REPO_URL ?? "https://github.com/khanahmad4527/enamel";
 
@@ -84,12 +95,26 @@ function rewrite(html) {
    * hydrates and immediately asks for `/__manifest`, which cannot exist
    * on a static host, so every page load logs a 404 and the client
    * router starts treating the outbound GitHub links as internal routes.
-   * Removing the modules leaves HTML and CSS, which is what this is.
+   *
+   * All of them, not only the modules: the inline scroll-restoration
+   * script and the hydration context are only ever read by the modules,
+   * and the context alone was half of every page's bytes. The JSON-LD
+   * stays — it is data for search engines, not code.
    */
   html = html
-    .replace(/<script[^>]*type="module"[\s\S]*?<\/script>/g, "")
+    .replace(/<script(?![^>]*type="application\/ld\+json")[^>]*>[\s\S]*?<\/script>/g, "")
     .replace(/<link[^>]+rel="modulepreload"[^>]*>/g, "");
   return html;
+}
+
+/** Every crawled address becomes the public one, in pages, sitemap and robots alike. */
+function publicise(body) {
+  const out = body.replaceAll(SITE, PUBLIC_URL);
+  // Fail the export rather than publish a page that still points home:
+  // an escaped or scheme-less form would slip past the line above.
+  const host = new URL(SITE).host;
+  if (out.includes(host)) throw new Error(`${host} survived the rewrite — refusing to write it`);
+  return out;
 }
 
 const pages = new Map();           // path -> raw body
@@ -147,6 +172,6 @@ for (const url of assets) {
 
 // 3. the pages, now that the file names are known
 for (const [path, body] of pages) {
-  writePage(path, path.endsWith(".xml") || path.endsWith(".txt") ? body : rewrite(body));
+  writePage(path, publicise(path.endsWith(".xml") || path.endsWith(".txt") ? body : rewrite(body)));
 }
 console.log(`\n  ${seen.size} pages and ${assets.size} files in ${OUT}/`);

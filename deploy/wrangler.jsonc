@@ -23,9 +23,12 @@
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "../dist-static",
-    // Every page is written as <path>/index.html, so a request for
-    // /team is served /team/index.html without a redirect.
-    "html_handling": "auto-trailing-slash",
+    // Every page is written as <path>/index.html, and this serves
+    // /team/index.html at /team — the address the canonical, the sitemap
+    // and every link use — with /team/ redirecting to it. The default,
+    // auto-trailing-slash, does the opposite for folders: /team answered
+    // 307 to /team/, so each canonical named a redirect.
+    "html_handling": "drop-trailing-slash",
     "not_found_handling": "404-page"
   },
   // The apex is Ahmad's portfolio and is deliberately untouched.
